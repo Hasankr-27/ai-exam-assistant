@@ -67,7 +67,10 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("📙 DGS", callback_data="sinav_DGS"),
-            InlineKeyboardButton("📒 AGS", callback_data="sinav_AGS"),
+            InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
+        ],
+        [
+            InlineKeyboardButton("📓 Diğer", callback_data="sinav_DIGER"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)

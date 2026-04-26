@@ -20,7 +20,7 @@ def tablolari_olustur():
         CREATE TABLE IF NOT EXISTS kullanicilar (
             user_id             INTEGER PRIMARY KEY,
             sinav_turu          TEXT DEFAULT NULL,
-            kalan_hak           INTEGER DEFAULT 3,
+            kalan_hak INTEGER DEFAULT 7,
             abone_mi            INTEGER DEFAULT 0,
             abone_bitis_tarihi  TEXT DEFAULT NULL,
             gunluk_mesaj_sayisi INTEGER DEFAULT 0,
