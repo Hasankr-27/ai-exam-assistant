@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi, odeme_sec
 
 from telegram import Update
 from telegram.ext import (
@@ -46,6 +47,7 @@ def main():
 
     # ── Ödeme ─────────────────────────────────
     app.add_handler(PreCheckoutQueryHandler(on_odeme_kontrol))
+    app.add_handler(CallbackQueryHandler(odeme_sec, pattern="^odeme_(1ay|3ay)$"))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, odeme_tamamlandi))
 
     # ── Normal mesajlar ───────────────────────
