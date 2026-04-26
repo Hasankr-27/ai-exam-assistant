@@ -133,6 +133,7 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "konu": "📖 Hangi konuyu anlatmamı istersin?\nÖrnek: *türev*, *Atatürk ilkeleri*, *integral*",
         "soru": "❓ Hangi konuda soru hazırlayayım?\nÖrnek: *limit*, *Osmanlı tarihi*, *paragraf*",
         "plan": "📅 Sınava kaç günün var ve günde kaç saat çalışabilirsin?\nÖrnek: *60 gün, 4 saat*",
+        "sor": "💬 Aklındaki soruyu yaz, cevaplayayım!\nÖrnek: *türev ne işe yarar*, *KPSS'de en çok hangi konular çıkıyor*",
     }
 
     context.user_data["beklenen_islem"] = islem
@@ -296,7 +297,10 @@ async def _menu_goster(update: Update, sinav: str):
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
+            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),  # ← yeni
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+        ],
+        [
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
         ],
     ]

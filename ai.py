@@ -95,20 +95,26 @@ def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list) -> str:
 def soru_hazirla(konu: str, sinav_turu: str) -> str:
     response = client.messages.create(
         model="claude-haiku-4-5",
-        max_tokens=500,
+        max_tokens=600,
         messages=[
             {
                 "role": "user",
-                "content": f"""{sinav_turu} sınavı için {konu} konusunda 1 adet çoktan seçmeli soru hazırla.
-Format şöyle olsun:
+                "content": f"""{sinav_turu} sınavı için {konu} konusunda 1 çoktan seçmeli soru hazırla.
+
+ÖNEMLİ KURALLAR:
+1. Önce soruyu çöz ve doğru cevabı bul
+2. Doğru cevabın şıklarda olduğundan %100 emin ol
+3. Her adımı iki kez kontrol et
+4. Eğer doğru cevap şıklarda yoksa soruyu baştan yaz
+
+Format:
 ❓ Soru: ...
 A) ...
 B) ...
 C) ...
 D) ...
 E) ...
-
-Sadece soruyu yaz, cevabı ve açıklamayı YAZMA."""
+DOGRU_CEVAP: (sadece harf)"""
             }
         ]
     )

@@ -41,7 +41,7 @@ def main():
     # ── Buton tıklamaları (callback) ──────────
     app.add_handler(CallbackQueryHandler(sinav_sec,      pattern="^sinav_(YKS|KPSS|DGS|ALES|DIGER)$"))
     app.add_handler(CallbackQueryHandler(sinav_degistir, pattern="^sinav_degistir$"))
-    app.add_handler(CallbackQueryHandler(islem_sec,      pattern="^islem_(konu|soru|plan)$"))
+    app.add_handler(CallbackQueryHandler(islem_sec,      pattern="^islem_(konu|soru|plan|sor)$"))
     app.add_handler(CallbackQueryHandler(cevap_kontrol, pattern="^cevap_(A|B|C|D|E)$"))
 
     # ── Ödeme ─────────────────────────────────
