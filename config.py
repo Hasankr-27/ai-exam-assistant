@@ -32,6 +32,6 @@ if __name__ == "__main__":
     print("🔧 Config Kontrolü:")
     print(f"  TELEGRAM_TOKEN   : {'✅ var' if TELEGRAM_TOKEN else '❌ eksik'}")
     print(f"  ANTHROPIC_API_KEY: {'✅ var' if ANTHROPIC_API_KEY else '❌ eksik'}")
-    print(f"  Abonelik fiyatı  : {ABONELIK_FIYAT_TL} TL / {ABONELIK_STARS} Stars")
+    print(f"  Abonelik fiyatı  : {ABONELIK_3AY_STARS} TL / {ABONELIK_STARS} Stars")
     print(f"  Günlük limit     : {GUNLUK_LIMIT} mesaj")
     print(f"  Ücretsiz hak     : {UCRETSIZ_HAK} mesaj")
