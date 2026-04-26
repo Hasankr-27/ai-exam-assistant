@@ -1,6 +1,7 @@
 from collections import defaultdict
 import time
 
+from anthropic import Anthropic
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -12,7 +13,12 @@ from database import (
     gunluk_mesaj_kontrol,
     gunluk_mesaj_artir,
 )
-from ai import intent_kontrol, ai_cevap_al, soru_hazirla
+from ai import intent_kontrol, ai_cevap_al
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # ───────────────────────────────────────────
 # RATE LİMİTİNG
@@ -30,7 +36,7 @@ HAZIR_CEVAPLAR = {
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
     "fiyat":      "💳 Aylık abonelik 70 TL — günde sadece 2.3 TL!",
     "ucret":      "💳 Aylık abonelik 70 TL — günde sadece 2.3 TL!",
-    "sen kimsin": "🤖 Ben YKS, KPSS ve DGS konularında yardımcı olan bir sınav asistanıyım!",
+    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında yardımcı olan bir sınav asistanıyım!",
 }
 
 ABONELIK_MESAJI = (
@@ -47,7 +53,7 @@ LIMIT_MESAJI = (
 )
 
 ALAKASIZ_MESAJ = (
-    "📚 Sadece YKS, KPSS ve DGS konularında yardımcı olabiliyorum.\n"
+    "📚 Sadece sınav konularında yardımcı olabiliyorum.\n"
     "Sınav ile ilgili bir şeyler sor!"
 )
 
@@ -195,8 +201,60 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if beklenen == "soru":
-            cevap = soru_hazirla(metin, sinav)
+            # Soruyu üret, cevabı ayrı al
+            soru_response = client.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=600,
+                messages=[{
+                    "role": "user",
+                    "content": f"""{sinav} sınavı için {metin} konusunda 1 çoktan seçmeli soru hazırla.
+Format:
+❓ Soru: ...
+A) ...
+B) ...
+C) ...
+D) ...
+E) ...
+DOGRU_CEVAP: (sadece harf)
+
+Cevabı açıklama, sadece DOGRU_CEVAP satırını ekle."""
+                }]
+            ).content[0].text
+
+            # Doğru cevabı ayır
+            satirlar = soru_response.strip().split("\n")
+            dogru_cevap_satiri = [s for s in satirlar if s.startswith("DOGRU_CEVAP:")]
+            dogru_cevap = dogru_cevap_satiri[0].replace("DOGRU_CEVAP:", "").strip() if dogru_cevap_satiri else "A"
+            soru_metni = "\n".join([s for s in satirlar if not s.startswith("DOGRU_CEVAP:")])
+
+            # Context'e kaydet
+            context.user_data["dogru_cevap"] = dogru_cevap
+            context.user_data["son_soru"] = soru_metni
             context.user_data["beklenen_islem"] = None
+
+            # Şık butonları
+            keyboard = [[
+                InlineKeyboardButton("A", callback_data="cevap_A"),
+                InlineKeyboardButton("B", callback_data="cevap_B"),
+                InlineKeyboardButton("C", callback_data="cevap_C"),
+                InlineKeyboardButton("D", callback_data="cevap_D"),
+                InlineKeyboardButton("E", callback_data="cevap_E"),
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                soru_metni,
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
+
+            # Hak güncelle
+            if not durum["abone_mi"]:
+                kalan_hak_azalt(user_id)
+            else:
+                gunluk_mesaj_artir(user_id)
+            return
+
         else:
             gecmis = context.user_data.get("sohbet_gecmisi", [])
             cevap = ai_cevap_al(metin, sinav, gecmis)
@@ -209,7 +267,6 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not durum["abone_mi"]:
             kalan_hak_azalt(user_id)
             kalan = durum["kalan_hak"] - 1
-
             if kalan == 1:
                 cevap += "\n\n⚠️ *Son ücretsiz hakkın!* Devam için /abone yaz."
             elif kalan == 0:
@@ -262,7 +319,13 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("📘 YKS", callback_data="sinav_YKS"),
             InlineKeyboardButton("📗 KPSS", callback_data="sinav_KPSS"),
+        ],
+        [
             InlineKeyboardButton("📙 DGS", callback_data="sinav_DGS"),
+            InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
+        ],
+        [
+            InlineKeyboardButton("📓 Diğer", callback_data="sinav_DIGER"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -271,3 +334,47 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Hangi sınava geçmek istersin?",
         reply_markup=reply_markup,
     )
+
+
+# ───────────────────────────────────────────
+# CEVAP KONTROL (callback)
+# ───────────────────────────────────────────
+
+async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    kullanici_cevabi = query.data.replace("cevap_", "")
+    dogru_cevap = context.user_data.get("dogru_cevap")
+    soru = context.user_data.get("son_soru")
+    sinav = kullanici_durumu(query.from_user.id)["sinav_turu"]
+
+    if kullanici_cevabi == dogru_cevap:
+        await query.edit_message_text(
+            f"{soru}\n\n✅ *Doğru! Tebrikler* 🎉",
+            parse_mode="Markdown"
+        )
+    else:
+        await context.bot.send_chat_action(
+            chat_id=query.message.chat_id,
+            action="typing"
+        )
+
+        aciklama = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=300,
+            messages=[{
+                "role": "user",
+                "content": f"""Bu {sinav} sorusunda kullanıcı {kullanici_cevabi} şıkkını seçti ama doğru cevap {dogru_cevap}.
+Soru: {soru}
+Neden yanlış yaptığını kısaca açıkla ve doğru cevabı anlat. 3-4 cümle yeter, kısa tut."""
+            }]
+        ).content[0].text
+
+        await query.edit_message_text(
+            f"{soru}\n\n"
+            f"❌ *Yanlış!* Seçtiğin: {kullanici_cevabi}\n"
+            f"✅ *Doğru cevap: {dogru_cevap}*\n\n"
+            f"📝 {aciklama}",
+            parse_mode="Markdown"
+        )
