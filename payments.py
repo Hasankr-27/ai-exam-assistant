@@ -21,7 +21,7 @@ async def abone_ol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("1 Aylık — 80 ⭐", callback_data="odeme_1ay"),
+            InlineKeyboardButton("1 Aylık — 100 ⭐", callback_data="odeme_1ay"),
             InlineKeyboardButton("3 Aylık — 250 ⭐", callback_data="odeme_3ay"),
         ]
     ]
