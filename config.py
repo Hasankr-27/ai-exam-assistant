@@ -22,7 +22,7 @@ ABONELIK_GUN = 30         # Abonelik süresi (gün)
 
 # Telegram Stars — 1 Star ≈ 0.013$ civarı
 # 70 TL ≈ 2.2$ → yaklaşık 170 Stars
-ABONELIK_STARS = 170
+ABONELIK_STARS = 80
 
 # ───────────────────────────────────────────
 # KONTROL
