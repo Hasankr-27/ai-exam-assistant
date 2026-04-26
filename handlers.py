@@ -34,8 +34,8 @@ BEKLEME_SURESI = 3  # saniye
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 70 TL — günde sadece 2.3 TL!",
-    "ucret":      "💳 Aylık abonelik 70 TL — günde sadece 2.3 TL!",
+    "fiyat":      "💳 **Güncel Abonelik Paketleri:**\n\n• 1 Aylık Premium: 80 ⭐\n• 3 Aylık Premium: 250 ⭐ (Avantajlı Paket!)\n\nDetaylar ve satın alma için /paketler komutunu kullanabilirsin.",
+    "ucret":      "💳 **Abonelik Ücretleri:**\n\nSana özel 1 Aylık sadece 80 Yıldız! 🌟 Günde 3 Yıldız'dan bile ucuza geliyor. Hemen denemek için /paketler yaz.",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında yardımcı olan bir sınav asistanıyım!",
 }
 

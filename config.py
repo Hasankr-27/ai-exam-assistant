@@ -22,7 +22,7 @@ ABONELIK_3AY_STARS = 250   # 3 aylık
 
 # Telegram Stars — 1 Star ≈ 0.013$ civarı
 # 70 TL ≈ 2.2$ → yaklaşık 170 Stars
-ABONELIK_STARS = 80
+ABONELIK_STARS = 100
 
 # ───────────────────────────────────────────
 # KONTROL
