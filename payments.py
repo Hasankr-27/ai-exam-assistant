@@ -64,7 +64,8 @@ async def odeme_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         title=f"Sınav Asistanı — {baslik}",
         description=aciklama,
         payload=f"abonelik_{gun}gun",
-        currency="XTR",
+        provider_token="",  # BAK BURASI ÇOK KRİTİK! Burayı böyle BOMBOŞ bırak kanka.
+        currency="XTR",  # Yıldız birimi
         prices=[LabeledPrice(baslik, stars)],
     )
 
