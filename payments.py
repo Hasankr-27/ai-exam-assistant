@@ -29,8 +29,8 @@ async def abone_ol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "💳 Abonelik seçenekleri:\n\n"
-        "• 1 Aylık → 80 Stars\n"
-        "• 3 Aylık → 250 Stars (%30 indirimli 🎉)\n\n"
+        "• 1 Aylık → 100 Stars\n"
+        "• 3 Aylık → 250 Stars (%20 indirimli 🎉)\n\n"
         "Hangisini tercih edersin?",
         reply_markup=reply_markup,
     )
