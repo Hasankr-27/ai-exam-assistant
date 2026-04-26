@@ -378,3 +378,75 @@ Neden yanlış yaptığını kısaca açıkla ve doğru cevabı anlat. 3-4 cüml
             f"📝 {aciklama}",
             parse_mode="Markdown"
         )
+
+# ───────────────────────────────────────────
+# FOTOĞRAF İŞLEME (abonelere özel)
+# ───────────────────────────────────────────
+
+async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    kullanici_olustur(user_id)
+    durum = kullanici_durumu(user_id)
+
+    # Sadece aboneler kullanabilir
+    if not durum["abone_mi"]:
+        await update.message.reply_text(
+            "📸 Fotoğrafla soru çözme sadece abonelere özel!\n"
+            "Abone olmak için /abone yaz."
+        )
+        return
+
+    # Günlük limit kontrolü
+    if not gunluk_mesaj_kontrol(user_id):
+        await update.message.reply_text(LIMIT_MESAJI)
+        return
+
+    await context.bot.send_chat_action(
+        chat_id=update.effective_chat.id,
+        action="typing"
+    )
+
+    try:
+        # Fotoğrafı indir
+        foto = update.message.photo[-1]  # en yüksek kaliteli
+        foto_dosyasi = await context.bot.get_file(foto.file_id)
+        foto_bytes = await foto_dosyasi.download_as_bytearray()
+
+        # Base64'e çevir
+        import base64
+        foto_base64 = base64.standard_b64encode(bytes(foto_bytes)).decode("utf-8")
+
+        sinav = durum["sinav_turu"] or "ÖSYM"
+
+        # Claude'a gönder
+        response = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=1000,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": foto_base64,
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": f"Bu {sinav} sınav sorusunu çöz. Adım adım kısa açıkla, sonucu belirt."
+                    }
+                ]
+            }]
+        )
+
+        cevap = response.content[0].text
+        gunluk_mesaj_artir(user_id)
+
+        await update.message.reply_text(cevap, parse_mode="Markdown")
+        await _menu_goster(update, sinav)
+
+    except Exception as e:
+        await update.message.reply_text("⚠️ Fotoğraf işlenemedi, tekrar dener misin?")
+        print(f"Fotoğraf hatası: {e}")

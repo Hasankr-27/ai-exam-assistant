@@ -19,6 +19,7 @@ from handlers import (
     mesaj_isle,
     sinav_degistir,
     cevap_kontrol,
+    fotograf_isle,
 )
 from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi
 
@@ -49,6 +50,7 @@ def main():
 
     # ── Normal mesajlar ───────────────────────
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj_isle))
+    app.add_handler(MessageHandler(filters.PHOTO, fotograf_isle))
 
     # ── Botu başlat ───────────────────────────
     print("✅ Bot çalışıyor... Durdurmak için CTRL+C")
