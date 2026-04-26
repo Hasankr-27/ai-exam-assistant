@@ -54,7 +54,7 @@ async def odeme_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         stars = ABONELIK_3AY_STARS
         baslik = "3 Aylık Abonelik"
-        aciklama = "✅ Günde 70 mesaj\n✅ 90 gün geçerli\n✅ %30 indirimli 🎉"
+        aciklama = "✅ Günde 70 mesaj\n✅ 90 gün geçerli\n✅ %20 indirimli 🎉"
         gun = 90
 
     context.user_data["abonelik_gun"] = gun
