@@ -312,36 +312,28 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     onceki_sorular = []
 
     for i in range(sayi):
+        onceki = "\n".join(onceki_sorular) if onceki_sorular else "Yok"
+
         soru_response = client.messages.create(
             model=model,
-            max_tokens=600,
+            max_tokens=800,
             messages=[{
                 "role": "user",
-                "content": f"""{sinav} sınavı {ders} dersi {konu} konusu için soru #{i+1} hazırla.
-
-Daha önce sorulan sorular (BUNLARI TEKRAR SORMA):
-{chr(10).join(onceki_sorular) if onceki_sorular else "Henüz soru yok"}
-
-ÖNEMLİ:
-1. Önce çöz, doğru cevabın şıklarda olduğundan emin ol
-2. Yukarıdaki sorulardan TAMAMEN farklı olsun
-3. Gerçek {sinav} tarzında olsun
-
-Format:
-Soru {i+1}: ...
-A) ...
-B) ...
-C) ...
-D) ...
-E) ...
-DOGRU_CEVAP: (sadece harf)"""
+                "content": f"{sinav} sınavı {ders} dersi {konu} konusundan soru {i+1} yaz. Daha önce sorulanlar: {onceki}. Sadece şu formatı kullan, başka hiçbir şey yazma:\n\nSoru: ...\nA) ...\nB) ...\nC) ...\nD) ...\nE) ...\nCEVAP: X"
             }]
         ).content[0].text
 
-        satirlar = soru_response.strip().split("\n")
-        dogru_cevap_satiri = [s for s in satirlar if s.startswith("DOGRU_CEVAP:")]
-        dogru_cevap = dogru_cevap_satiri[0].replace("DOGRU_CEVAP:", "").strip() if dogru_cevap_satiri else "A"
-        soru_metni = "\n".join([s for s in satirlar if not s.startswith("DOGRU_CEVAP:")])
+        satirlar = [s.strip() for s in soru_response.strip().split("\n") if s.strip()]
+        dogru_cevap = "A"
+        soru_satirlari = []
+
+        for satir in satirlar:
+            if satir.upper().startswith("CEVAP:"):
+                dogru_cevap = satir.split(":")[-1].strip()[0].upper()
+            else:
+                soru_satirlari.append(satir)
+
+        soru_metni = "\n".join(soru_satirlari)
 
         context.user_data[f"soru_{i}"] = soru_metni
         context.user_data[f"cevap_{i}"] = dogru_cevap
