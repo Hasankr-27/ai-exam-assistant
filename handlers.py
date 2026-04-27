@@ -309,20 +309,23 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(f"⏳ {sayi} soru hazırlanıyor...")
 
-    # Hepsini paralel hazırla
-    async def tek_soru_hazirla(i):
-        return client.messages.create(
+    onceki_sorular = []
+
+    for i in range(sayi):
+        soru_response = client.messages.create(
             model=model,
             max_tokens=600,
             messages=[{
                 "role": "user",
-                "content": f"""{sinav} sınavı {ders} dersi için {konu} konusunda özgün soru #{i+1} hazırla.
+                "content": f"""{sinav} sınavı {ders} dersi {konu} konusu için soru #{i+1} hazırla.
+
+Daha önce sorulan sorular (BUNLARI TEKRAR SORMA):
+{chr(10).join(onceki_sorular) if onceki_sorular else "Henüz soru yok"}
 
 ÖNEMLİ:
-1. Önce soruyu çöz, doğru cevabı bul
-2. Doğru cevabın şıklarda olduğundan %100 emin ol
+1. Önce çöz, doğru cevabın şıklarda olduğundan emin ol
+2. Yukarıdaki sorulardan TAMAMEN farklı olsun
 3. Gerçek {sinav} tarzında olsun
-4. Diğer sorulardan farklı olsun
 
 Format:
 Soru {i+1}: ...
@@ -335,29 +338,6 @@ DOGRU_CEVAP: (sadece harf)"""
             }]
         ).content[0].text
 
-    # Paralel çalıştır
-    sonuclar = await asyncio.gather(*[
-        asyncio.to_thread(lambda i=i: client.messages.create(
-            model=model,
-            max_tokens=600,
-            messages=[{
-                "role": "user",
-                "content": f"""{sinav} sınavı {ders} dersi {konu} konusu soru #{i+1}.
-Önce çöz, doğru cevabın şıklarda olduğundan emin ol, gerçek {sinav} tarzında yaz.
-Format:
-Soru {i+1}: ...
-A) ...
-B) ...
-C) ...
-D) ...
-E) ...
-DOGRU_CEVAP: (sadece harf)"""
-            }]
-        ).content[0].text)
-        for i in range(sayi)
-    ])
-
-    for i, soru_response in enumerate(sonuclar):
         satirlar = soru_response.strip().split("\n")
         dogru_cevap_satiri = [s for s in satirlar if s.startswith("DOGRU_CEVAP:")]
         dogru_cevap = dogru_cevap_satiri[0].replace("DOGRU_CEVAP:", "").strip() if dogru_cevap_satiri else "A"
@@ -365,6 +345,7 @@ DOGRU_CEVAP: (sadece harf)"""
 
         context.user_data[f"soru_{i}"] = soru_metni
         context.user_data[f"cevap_{i}"] = dogru_cevap
+        onceki_sorular.append(soru_metni)
 
     context.user_data["toplam_soru"] = sayi
     context.user_data["beklenen_islem"] = None
