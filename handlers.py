@@ -1,12 +1,10 @@
 from collections import defaultdict
 import time
-import os
 import base64
 
 from anthropic import Anthropic
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from dotenv import load_dotenv
 
 from database import (
     kullanici_olustur,
@@ -16,9 +14,9 @@ from database import (
     gunluk_mesaj_kontrol,
     gunluk_mesaj_artir,
 )
-
-# YENİ FONKSİYONU DA BURAYA EKLEDİK (soru_hazirla)
-from ai import intent_kontrol, ai_cevap_al, soru_hazirla
+from ai import intent_kontrol, ai_cevap_al, soru_hazirla, SINAV_DERSLERI
+import os
+from dotenv import load_dotenv
 
 load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -28,41 +26,37 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 # ───────────────────────────────────────────
 
 son_mesaj_zamani = defaultdict(float)
-BEKLEME_SURESI = 3  # saniye
-
-# ───────────────────────────────────────────
-# HAZIR MESAJLAR
-# ───────────────────────────────────────────
+BEKLEME_SURESI = 3
 
 # ───────────────────────────────────────────
 # HAZIR MESAJLAR
 # ───────────────────────────────────────────
 
 HAZIR_CEVAPLAR = {
-    "merhaba": "👋 Merhaba! /start yazarak başlayabilirsin.",
-    "selam": "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat": "💳 **Güncel Abonelik Paketleri:**\n\n• 1 Aylık Premium: 100 ⭐\n• 3 Aylık Premium: 250 ⭐ (Avantajlı Paket!)\n\nDetaylar ve satın alma için /paketler komutunu kullanabilirsin.",
-    "ucret": "💳 **Abonelik Ücretleri:**\n\nSana özel 1 Aylık sadece 100 Yıldız! 🌟 Günde 3 Yıldız'dan bile ucuza geliyor. Hemen denemek için /paketler yaz.",
-    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında yardımcı olan bir profesyonel sınav asistanıyım!",
+    "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
+    "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
+    "fiyat":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 250 ⭐!",
+    "ucret":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 250 ⭐!",
+    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında uzman bir asistanım!",
 }
 
 ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
-    "📚 Kesintisiz eğitime devam etmek için Premium'a geç:\n"
-    "• Günde 70 mesaj hakkı 🚀\n"
-    "• Claude 3.5 Sonnet Zekası 🧠\n"
-    "• Aylık sadece 100 ⭐\n\n"
-    "Hemen abone olmak için /paketler yaz."
+    "📚 Devam etmek için abone ol:\n"
+    "• Günde 70 mesaj hakkı\n"
+    "• 1 Aylık → 80 ⭐\n"
+    "• 3 Aylık → 250 ⭐\n\n"
+    "Abone olmak için /abone yaz."
 )
 
 LIMIT_MESAJI = (
-    "⏰ Bugünlük 70 mesaj hakkını doldurdun kanka!\n"
-    "Yarın sıfırlanacak. O zamana kadar dinlen, yarın görüşürüz 💪"
+    "⏰ Bugünlük mesaj hakkını kullandın!\n"
+    "Yarın sıfırlanacak. Yarın görüşürüz 💪"
 )
 
 ALAKASIZ_MESAJ = (
     "📚 Sadece sınav konularında yardımcı olabiliyorum.\n"
-    "Lütfen sınav, ders veya çalışma planı ile ilgili bir şeyler sor!"
+    "Sınav ile ilgili bir şeyler sor!"
 )
 
 
@@ -101,10 +95,6 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # SINAV SEÇİMİ (callback)
 # ───────────────────────────────────────────
 
-# ───────────────────────────────────────────
-# SINAV SEÇİMİ (callback)
-# ───────────────────────────────────────────
-
 async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -112,16 +102,14 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     sinav = query.data.replace("sinav_", "")
     sinav_turu_guncelle(user_id, sinav)
-    context.user_data["sinav_turu"] = sinav # Sınavı hafızada tutuyoruz
 
-    # YENİ KLAVYE DÜZENİ (Soru Sor Eklendi)
     keyboard = [
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
-            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"), # <-- İŞTE BURAYA GELDİ KANKA
+            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
     ]
@@ -143,140 +131,62 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     islem = query.data.replace("islem_", "")
-    sinav = context.user_data.get("sinav_turu", "YKS")
+    user_id = query.from_user.id
+    durum = kullanici_durumu(user_id)
+    sinav = durum["sinav_turu"] or "YKS"
 
-    # YENİ SİSTEM: Soru hazırlama seçildiyse dersleri listele
+    # Soru hazırla → önce dersler çıksın
     if islem == "soru":
-        dersler_sozlugu = {
-            "YKS": ["Matematik", "Türkçe", "Fizik", "Kimya", "Biyoloji", "Tarih", "Coğrafya"],
-            "KPSS": ["Matematik", "Türkçe", "Tarih", "Coğrafya", "Vatandaşlık", "Eğitim Bilimleri"],
-            "DGS": ["Matematik", "Türkçe"],
-            "ALES": ["Matematik", "Türkçe"]
-        }
-
-        aktif_dersler = dersler_sozlugu.get(sinav, ["Genel Yetenek", "Genel Kültür"])
+        dersler = SINAV_DERSLERI.get(sinav, {})
         keyboard = []
+        ders_listesi = list(dersler.keys())
 
-        for i in range(0, len(aktif_dersler), 2):
-            satir = [InlineKeyboardButton(aktif_dersler[i], callback_data=f"ders_{aktif_dersler[i]}")]
-            if i + 1 < len(aktif_dersler):
-                satir.append(InlineKeyboardButton(aktif_dersler[i + 1], callback_data=f"ders_{aktif_dersler[i + 1]}"))
+        # İkili buton sırala
+        for i in range(0, len(ders_listesi), 2):
+            satir = [InlineKeyboardButton(ders_listesi[i], callback_data=f"ders_{ders_listesi[i]}")]
+            if i + 1 < len(ders_listesi):
+                satir.append(InlineKeyboardButton(ders_listesi[i+1], callback_data=f"ders_{ders_listesi[i+1]}"))
             keyboard.append(satir)
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(f"📚 {sinav} sınavı için hangi dersten soru hazırlayayım?",
-                                      reply_markup=reply_markup)
-        return  # İşlemi burada kesiyoruz ki mesajlar sözlüğüne girmesin
+        await query.edit_message_text(
+            f"📚 {sinav} — Hangi dersten soru hazırlayayım?",
+            reply_markup=reply_markup,
+        )
+        return
 
-    # Diğer normal işlemler
     mesajlar = {
         "konu": "📖 Hangi konuyu anlatmamı istersin?\nÖrnek: *türev*, *Atatürk ilkeleri*, *integral*",
+        "sor":  "💬 Aklındaki soruyu yaz, cevaplayayım!\nÖrnek: *türev ne işe yarar*, *KPSS'de en çok hangi konular çıkıyor*",
         "plan": "📅 Sınava kaç günün var ve günde kaç saat çalışabilirsin?\nÖrnek: *60 gün, 4 saat*",
-        "sor": "💬 Aklındaki soruyu yaz, cevaplayayım!\nÖrnek: *türev ne işe yarar*, *KPSS'de en çok hangi konular çıkıyor*",
     }
 
     context.user_data["beklenen_islem"] = islem
 
     await query.edit_message_text(
-        mesajlar[islem],
+        mesajlar.get(islem, "Ne yapmak istersin?"),
         parse_mode="Markdown",
     )
 
 
 # ───────────────────────────────────────────
-# YENİ: DERS SEÇİLDİ (callback)
+# DERS SEÇİMİ (callback)
 # ───────────────────────────────────────────
 
-# ───────────────────────────────────────────
-# YENİ: DERS SEÇİLDİ (callback)
-# ───────────────────────────────────────────
-
-async def ders_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    secilen_ders = query.data.replace("ders_", "")
-    context.user_data["secilen_ders"] = secilen_ders
-    context.user_data["durum"] = "KONU_BEKLENIYOR" # Bot artık konuyu bekleyecek
+    ders = query.data.replace("ders_", "")
+    context.user_data["secilen_ders"] = ders
+    context.user_data["beklenen_islem"] = "soru"
 
     await query.edit_message_text(
-        f"✅ Ders: *{secilen_ders}*\n\n"
-        "Şimdi bana hangi konudan soru istediğini yaz 🎯",
-        parse_mode="Markdown"
+        f"✅ *{ders}* seçildi!\n\n"
+        "📝 Hangi konudan soru hazırlayayım?\n"
+        "Örnek: *türev*, *osmanlı tarihi*, *paragraf*",
+        parse_mode="Markdown",
     )
-
-
-# ───────────────────────────────────────────
-# YENİ: ADET SEÇİLDİ (callback) -> AI TETİKLENİR
-# ───────────────────────────────────────────
-
-async def adet_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    # Seçimleri al
-    adet = int(query.data.replace("adet_", ""))
-    sinav = context.user_data.get("sinav_turu", "YKS")
-    ders = context.user_data.get("secilen_ders", "Matematik")
-    konu = context.user_data.get("secilen_konu", "Genel")
-
-    user_id = update.effective_user.id
-    durum = kullanici_durumu(user_id)
-    abone_mi = durum["abone_mi"]
-
-    # 1) Hak Kontrolü
-    if not abone_mi and durum["kalan_hak"] <= 0:
-        await query.edit_message_text(ABONELIK_MESAJI)
-        return
-    if abone_mi and not gunluk_mesaj_kontrol(user_id):
-        await query.edit_message_text(LIMIT_MESAJI)
-        return
-
-    # 2) Bekleme Mesajı
-    await query.edit_message_text(
-        f"🚀 *{sinav} Uzmanı* sizin için hazırlıyor...\n\n"
-        f"📚 *Ders:* {ders}\n"
-        f"🎯 *Konu:* {konu}\n"
-        f"📝 *Adet:* {adet}\n\n"
-        "_Lütfen bekleyin, sorular yükleniyor..._",
-        parse_mode="Markdown"
-    )
-
-    try:
-        # 3) Yapay Zekayı Çağır (ai.py'deki yeni fonksiyonun)
-        cevap = soru_hazirla(
-            sinav_turu=sinav,
-            ders=ders,
-            konu=konu,
-            adet=adet,
-            abone_mi=abone_mi
-        )
-
-        # 4) Hakları Düş
-        if not abone_mi:
-            kalan_hak_azalt(user_id)
-        else:
-            gunluk_mesaj_artir(user_id)
-
-        # 5) Soruları Gönder (Markdown desteğiyle)
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=cevap,
-            parse_mode="Markdown"
-        )
-
-        # 6) Durumu Sıfırla ve Menüyü Göster
-        context.user_data["durum"] = "BOSTA"
-        # query üzerinden menüyü çağırmak daha sağlıklıdır
-        await _menu_goster(query, sinav)
-
-    except Exception as e:
-        print(f"🚨 Soru Hazırlama Hatası: {e}")
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text="⚠️ Kanka Claude şu an çok yoğun, soruları hazırlayamadı. Lütfen az sonra tekrar dene!"
-        )
-        context.user_data["durum"] = "BOSTA"
 
 
 # ───────────────────────────────────────────
@@ -285,107 +195,248 @@ async def adet_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    metin = update.message.text.strip()
-    metin_lower = metin.lower()
+    metin = update.message.text.lower().strip()
 
-    # 0) YENİ SİSTEM: Konu bekleme durumu yakalayıcısı
-    if context.user_data.get("durum") == "KONU_BEKLENIYOR":
-        context.user_data["secilen_konu"] = metin
-        context.user_data["durum"] = "ADET_BEKLENIYOR"
-
-        keyboard = [[InlineKeyboardButton(str(i), callback_data=f"adet_{i}") for i in range(1, 6)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            f"🎯 *Konu:* {metin}\n\nKaç tane soru hazırlayayım kanka? (Maksimum 5)",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-        return  # Normal AI akışına girmemesi için işlemi burada bitiriyoruz
-
-    # 1) Rate limit kontrolü
+    # 0) Rate limit kontrolü
     simdi = time.time()
     if simdi - son_mesaj_zamani[user_id] < BEKLEME_SURESI:
         await update.message.reply_text("⏳ Çok hızlı! Lütfen 3 saniye bekle.")
         return
     son_mesaj_zamani[user_id] = simdi
 
-    # 2) Hazır cevap var mı?
-    if metin_lower in HAZIR_CEVAPLAR:
-        await update.message.reply_text(HAZIR_CEVAPLAR[metin_lower])
+    # 1) Hazır cevap var mı?
+    if metin in HAZIR_CEVAPLAR:
+        await update.message.reply_text(HAZIR_CEVAPLAR[metin])
         return
 
-    # 3) Kullanıcıyı oluştur / getir
+    # 2) Kullanıcıyı oluştur / getir
     kullanici_olustur(user_id)
     durum = kullanici_durumu(user_id)
 
-    # 4) Sınav türü seçilmiş mi?
+    # 3) Sınav türü seçilmiş mi?
     if not durum["sinav_turu"]:
         await update.message.reply_text(
             "⚠️ Önce sınav türünü seç!\n/start yazarak başlayabilirsin."
         )
         return
 
-    # 5) Ücretsiz hak kontrolü
+    # 4) Ücretsiz hak kontrolü
     if not durum["abone_mi"] and durum["kalan_hak"] <= 0:
         await update.message.reply_text(ABONELIK_MESAJI)
         return
 
-    # 6) Günlük limit kontrolü (sadece aboneler için)
+    # 5) Günlük limit kontrolü
     if durum["abone_mi"] and not gunluk_mesaj_kontrol(user_id):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-    # 7) Intent filtre (Girinti hatası buradaydı, düzelttim!)
+    # 6) Intent filtre
     if not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
-        await _menu_goster(update, durum["sinav_turu"])
         return
 
-    # 8) "Yazıyor..." göster
-    await context.bot.send_chat_action(
-        chat_id=update.effective_chat.id,
-        action="typing"
-    )
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-    # 9) Normal AI Muhabbeti (Konu, Plan, Soru Sor vb.)
+    beklenen = context.user_data.get("beklenen_islem", "genel")
     sinav = durum["sinav_turu"]
 
     try:
-        gecmis = context.user_data.get("sohbet_gecmisi", [])
-        cevap = ai_cevap_al(metin, sinav, gecmis, durum["abone_mi"])
+        # ── SORU KONUSU GELDİ → kaç soru sor ──
+        if beklenen == "soru" and context.user_data.get("secilen_ders"):
+            context.user_data["soru_konusu"] = metin
+            context.user_data["beklenen_islem"] = "soru_sayi"
 
-        gecmis.append({"role": "user", "content": metin})
-        gecmis.append({"role": "assistant", "content": cevap})
-        context.user_data["sohbet_gecmisi"] = gecmis[-10:]
+            keyboard = [[
+                InlineKeyboardButton("1", callback_data="sayi_1"),
+                InlineKeyboardButton("2", callback_data="sayi_2"),
+                InlineKeyboardButton("3", callback_data="sayi_3"),
+                InlineKeyboardButton("4", callback_data="sayi_4"),
+                InlineKeyboardButton("5", callback_data="sayi_5"),
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # 10) Hak / sayaç güncelle
+            await update.message.reply_text(
+                f"📝 *{metin}* konusunda kaç soru hazırlayayım?",
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
+            return
+
+        # ── NORMAL SOHBET ──
+        else:
+            gecmis = context.user_data.get("sohbet_gecmisi", [])
+            cevap = ai_cevap_al(metin, sinav, gecmis, durum["abone_mi"])
+
+            gecmis.append({"role": "user", "content": metin})
+            gecmis.append({"role": "assistant", "content": cevap})
+            context.user_data["sohbet_gecmisi"] = gecmis[-10:]
+
+        # Hak güncelle
         if not durum["abone_mi"]:
             kalan_hak_azalt(user_id)
             kalan = durum["kalan_hak"] - 1
             if kalan == 1:
-                cevap += "\n\n⚠️ *Son ücretsiz hakkın!* Devam için /paketler yaz."
-            elif kalan <= 0:
-                cevap += "\n\n⛔ *Ücretsiz hakkın bitti.* Devam için /paketler yaz."
+                cevap += "\n\n⚠️ *Son ücretsiz hakkın!* Devam için /abone yaz."
+            elif kalan == 0:
+                cevap += "\n\n⛔ *Ücretsiz hakkın bitti.* Devam için /abone yaz."
         else:
             gunluk_mesaj_artir(user_id)
 
-        # 11) Cevabı gönder + menüyü tekrar göster
         await update.message.reply_text(cevap, parse_mode="Markdown")
         await _menu_goster(update, sinav)
 
     except Exception as e:
-        print(f"Hata detayı: {e}")
         await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        print(f"Hata: {e}")
 
 
 # ───────────────────────────────────────────
-# YARDIMCI: menüyü tekrar göster
+# SORU SAYISI SEÇİMİ (callback)
+# ───────────────────────────────────────────
+
+async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    sayi = int(query.data.replace("sayi_", ""))
+    konu = context.user_data.get("soru_konusu", "")
+    ders = context.user_data.get("secilen_ders", "")
+    user_id = query.from_user.id
+    durum = kullanici_durumu(user_id)
+    sinav = durum["sinav_turu"]
+
+    await query.edit_message_text(
+        f"⏳ {sayi} soru hazırlanıyor, lütfen bekle..."
+    )
+
+    for i in range(sayi):
+        soru_response = client.messages.create(
+            model="claude-sonnet-4-5" if durum["abone_mi"] else "claude-haiku-4-5",
+            max_tokens=600,
+            messages=[{
+                "role": "user",
+                "content": f"""{sinav} sınavı {ders} dersi için {konu} konusunda özgün bir çoktan seçmeli soru hazırla.
+Daha önce sorulmamış, farklı bir soru olsun.
+
+ÖNEMLİ:
+1. Önce soruyu çöz, doğru cevabı bul
+2. Doğru cevabın şıklarda olduğundan %100 emin ol
+3. Gerçek {sinav} sınav tarzında olsun
+
+Format:
+❓ Soru {i+1}: ...
+A) ...
+B) ...
+C) ...
+D) ...
+E) ...
+DOGRU_CEVAP: (sadece harf)"""
+            }]
+        ).content[0].text
+
+        # Doğru cevabı ayır
+        satirlar = soru_response.strip().split("\n")
+        dogru_cevap_satiri = [s for s in satirlar if s.startswith("DOGRU_CEVAP:")]
+        dogru_cevap = dogru_cevap_satiri[0].replace("DOGRU_CEVAP:", "").strip() if dogru_cevap_satiri else "A"
+        soru_metni = "\n".join([s for s in satirlar if not s.startswith("DOGRU_CEVAP:")])
+
+        # Her soruyu ayrı sakla
+        context.user_data[f"soru_{i}"] = soru_metni
+        context.user_data[f"cevap_{i}"] = dogru_cevap
+        context.user_data["toplam_soru"] = sayi
+        context.user_data["mevcut_soru"] = 0
+        context.user_data["beklenen_islem"] = None
+        context.user_data["secilen_ders"] = None
+
+    # İlk soruyu gönder
+    await _soru_gonder(query.message.chat_id, context, 0)
+
+    if not durum["abone_mi"]:
+        kalan_hak_azalt(user_id)
+    else:
+        gunluk_mesaj_artir(user_id)
+
+
+async def _soru_gonder(chat_id, context, index):
+    """Belirtilen indexdeki soruyu gönderir."""
+    soru = context.user_data.get(f"soru_{index}", "")
+    toplam = context.user_data.get("toplam_soru", 1)
+
+    keyboard = [[
+        InlineKeyboardButton("A", callback_data=f"cevap_{index}_A"),
+        InlineKeyboardButton("B", callback_data=f"cevap_{index}_B"),
+        InlineKeyboardButton("C", callback_data=f"cevap_{index}_C"),
+        InlineKeyboardButton("D", callback_data=f"cevap_{index}_D"),
+        InlineKeyboardButton("E", callback_data=f"cevap_{index}_E"),
+    ]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"📊 Soru {index+1}/{toplam}\n\n{soru}",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+
+# ───────────────────────────────────────────
+# CEVAP KONTROL (callback)
+# ───────────────────────────────────────────
+
+async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    parcalar = query.data.split("_")  # "cevap_0_A" → ["cevap", "0", "A"]
+    index = int(parcalar[1])
+    kullanici_cevabi = parcalar[2]
+
+    dogru_cevap = context.user_data.get(f"cevap_{index}")
+    soru = context.user_data.get(f"soru_{index}")
+    toplam = context.user_data.get("toplam_soru", 1)
+    sinav = kullanici_durumu(query.from_user.id)["sinav_turu"]
+
+    if kullanici_cevabi == dogru_cevap:
+        sonuc = f"✅ *Doğru! Tebrikler* 🎉"
+        await query.edit_message_text(
+            f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n{sonuc}",
+            parse_mode="Markdown"
+        )
+    else:
+        await context.bot.send_chat_action(chat_id=query.message.chat_id, action="typing")
+
+        aciklama = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=300,
+            messages=[{
+                "role": "user",
+                "content": f"""{sinav} sorusunda kullanıcı {kullanici_cevabi} seçti ama doğru cevap {dogru_cevap}.
+Soru: {soru}
+Neden yanlış yaptığını kısaca açıkla, doğru cevabı anlat. 3-4 cümle yeter."""
+            }]
+        ).content[0].text
+
+        await query.edit_message_text(
+            f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n"
+            f"❌ *Yanlış!* Seçtiğin: {kullanici_cevabi}\n"
+            f"✅ *Doğru: {dogru_cevap}*\n\n"
+            f"📝 {aciklama}",
+            parse_mode="Markdown"
+        )
+
+    # Sıradaki soru var mı?
+    if index + 1 < toplam:
+        await _soru_gonder(query.message.chat_id, context, index + 1)
+    else:
+        durum = kullanici_durumu(query.from_user.id)
+        await _menu_goster_chat(query.message.chat_id, context, durum["sinav_turu"])
+
+
+# ───────────────────────────────────────────
+# YARDIMCI: menü göster
 # ───────────────────────────────────────────
 
 async def _menu_goster(update: Update, sinav: str):
-    # Eğer update bir callback_query ise mesajı göndermek için query.message kullanmalıyız
-    is_callback = hasattr(update, "callback_query") and update.callback_query is not None
-
     keyboard = [
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
@@ -400,13 +451,32 @@ async def _menu_goster(update: Update, sinav: str):
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        f"📚 {sinav} — Başka ne yapmak istersin?",
+        reply_markup=reply_markup,
+    )
 
-    text = f"📚 {sinav} — Başka ne yapmak istersin?"
 
-    if is_callback:
-        await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
-    else:
-        await update.message.reply_text(text, reply_markup=reply_markup)
+async def _menu_goster_chat(chat_id, context, sinav: str):
+    keyboard = [
+        [
+            InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+            InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+        ],
+        [
+            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),
+            InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"📚 {sinav} — Başka ne yapmak istersin?",
+        reply_markup=reply_markup,
+    )
 
 
 # ───────────────────────────────────────────
@@ -439,50 +509,6 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────────────────────────
-# ESKİ CEVAP KONTROL (Şu an kullanılmıyor ama kalsın)
-# ───────────────────────────────────────────
-
-async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    kullanici_cevabi = query.data.replace("cevap_", "")
-    dogru_cevap = context.user_data.get("dogru_cevap")
-    soru = context.user_data.get("son_soru")
-    sinav = kullanici_durumu(query.from_user.id)["sinav_turu"]
-
-    if kullanici_cevabi == dogru_cevap:
-        await query.edit_message_text(
-            f"{soru}\n\n✅ *Doğru! Tebrikler* 🎉",
-            parse_mode="Markdown"
-        )
-    else:
-        await context.bot.send_chat_action(
-            chat_id=query.message.chat_id,
-            action="typing"
-        )
-
-        aciklama = client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=300,
-            messages=[{
-                "role": "user",
-                "content": f"""Bu {sinav} sorusunda kullanıcı {kullanici_cevabi} şıkkını seçti ama doğru cevap {dogru_cevap}.
-Soru: {soru}
-Neden yanlış yaptığını kısaca açıkla ve doğru cevabı anlat. 3-4 cümle yeter, kısa tut."""
-            }]
-        ).content[0].text
-
-        await query.edit_message_text(
-            f"{soru}\n\n"
-            f"❌ *Yanlış!* Seçtiğin: {kullanici_cevabi}\n"
-            f"✅ *Doğru cevap: {dogru_cevap}*\n\n"
-            f"📝 {aciklama}",
-            parse_mode="Markdown"
-        )
-
-
-# ───────────────────────────────────────────
 # FOTOĞRAF İŞLEME (abonelere özel)
 # ───────────────────────────────────────────
 
@@ -502,24 +528,19 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-    await context.bot.send_chat_action(
-        chat_id=update.effective_chat.id,
-        action="typing"
-    )
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
         foto = update.message.photo[-1]
         foto_dosyasi = await context.bot.get_file(foto.file_id)
         foto_bytes = await foto_dosyasi.download_as_bytearray()
-
         foto_base64 = base64.standard_b64encode(bytes(foto_bytes)).decode("utf-8")
+
         sinav = durum["sinav_turu"] or "ÖSYM"
 
-
         response = client.messages.create(
-            model="claude-4-5-haiku-20251001",
+            model="claude-sonnet-4-5",
             max_tokens=1000,
-
             messages=[{
                 "role": "user",
                 "content": [
@@ -533,7 +554,7 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     },
                     {
                         "type": "text",
-                        "text": f"Bu {sinav} sınav sorusunu çöz. Adım adım kısa açıkla, sonucu belirt."
+                        "text": f"Bu {sinav} sınav sorusunu adım adım çöz. Kısa ve net açıkla, sonucu belirt."
                     }
                 ]
             }]
