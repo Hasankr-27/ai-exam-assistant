@@ -159,6 +159,7 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "konu": "📖 Hangi konuyu anlatmamı istersin?\nÖrnek: *türev*, *Atatürk ilkeleri*, *integral*",
         "sor":  "💬 Aklındaki soruyu yaz, cevaplayayım!\nÖrnek: *türev ne işe yarar*, *KPSS'de en çok hangi konular çıkıyor*",
         "plan": "📅 Sınava kaç günün var ve günde kaç saat çalışabilirsin?\nÖrnek: *60 gün, 4 saat*",
+        "sorun": "🚨 Sorununu yaz, en kısa sürede inceleyeceğim!",
     }
 
     context.user_data["beklenen_islem"] = islem
@@ -292,6 +293,8 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # SORU SAYISI SEÇİMİ (callback)
 # ───────────────────────────────────────────
 
+import asyncio
+
 async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -302,27 +305,27 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     durum = kullanici_durumu(user_id)
     sinav = durum["sinav_turu"]
+    model = "claude-sonnet-4-5" if durum["abone_mi"] else "claude-haiku-4-5"
 
-    await query.edit_message_text(
-        f"⏳ {sayi} soru hazırlanıyor, lütfen bekle..."
-    )
+    await query.edit_message_text(f"⏳ {sayi} soru hazırlanıyor...")
 
-    for i in range(sayi):
-        soru_response = client.messages.create(
-            model="claude-sonnet-4-5" if durum["abone_mi"] else "claude-haiku-4-5",
+    # Hepsini paralel hazırla
+    async def tek_soru_hazirla(i):
+        return client.messages.create(
+            model=model,
             max_tokens=600,
             messages=[{
                 "role": "user",
-                "content": f"""{sinav} sınavı {ders} dersi için {konu} konusunda özgün bir çoktan seçmeli soru hazırla.
-Daha önce sorulmamış, farklı bir soru olsun.
+                "content": f"""{sinav} sınavı {ders} dersi için {konu} konusunda özgün soru #{i+1} hazırla.
 
 ÖNEMLİ:
 1. Önce soruyu çöz, doğru cevabı bul
 2. Doğru cevabın şıklarda olduğundan %100 emin ol
-3. Gerçek {sinav} sınav tarzında olsun
+3. Gerçek {sinav} tarzında olsun
+4. Diğer sorulardan farklı olsun
 
 Format:
-❓ Soru {i+1}: ...
+Soru {i+1}: ...
 A) ...
 B) ...
 C) ...
@@ -332,21 +335,41 @@ DOGRU_CEVAP: (sadece harf)"""
             }]
         ).content[0].text
 
-        # Doğru cevabı ayır
+    # Paralel çalıştır
+    sonuclar = await asyncio.gather(*[
+        asyncio.to_thread(lambda i=i: client.messages.create(
+            model=model,
+            max_tokens=600,
+            messages=[{
+                "role": "user",
+                "content": f"""{sinav} sınavı {ders} dersi {konu} konusu soru #{i+1}.
+Önce çöz, doğru cevabın şıklarda olduğundan emin ol, gerçek {sinav} tarzında yaz.
+Format:
+Soru {i+1}: ...
+A) ...
+B) ...
+C) ...
+D) ...
+E) ...
+DOGRU_CEVAP: (sadece harf)"""
+            }]
+        ).content[0].text)
+        for i in range(sayi)
+    ])
+
+    for i, soru_response in enumerate(sonuclar):
         satirlar = soru_response.strip().split("\n")
         dogru_cevap_satiri = [s for s in satirlar if s.startswith("DOGRU_CEVAP:")]
         dogru_cevap = dogru_cevap_satiri[0].replace("DOGRU_CEVAP:", "").strip() if dogru_cevap_satiri else "A"
         soru_metni = "\n".join([s for s in satirlar if not s.startswith("DOGRU_CEVAP:")])
 
-        # Her soruyu ayrı sakla
         context.user_data[f"soru_{i}"] = soru_metni
         context.user_data[f"cevap_{i}"] = dogru_cevap
-        context.user_data["toplam_soru"] = sayi
-        context.user_data["mevcut_soru"] = 0
-        context.user_data["beklenen_islem"] = None
-        context.user_data["secilen_ders"] = None
 
-    # İlk soruyu gönder
+    context.user_data["toplam_soru"] = sayi
+    context.user_data["beklenen_islem"] = None
+    context.user_data["secilen_ders"] = None
+
     await _soru_gonder(query.message.chat_id, context, 0)
 
     if not durum["abone_mi"]:
@@ -384,7 +407,7 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    parcalar = query.data.split("_")  # "cevap_0_A" → ["cevap", "0", "A"]
+    parcalar = query.data.split("_")
     index = int(parcalar[1])
     kullanici_cevabi = parcalar[2]
 
@@ -394,33 +417,28 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sinav = kullanici_durumu(query.from_user.id)["sinav_turu"]
 
     if kullanici_cevabi == dogru_cevap:
-        sonuc = f"✅ *Doğru! Tebrikler* 🎉"
-        await query.edit_message_text(
-            f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n{sonuc}",
-        )
+        mesaj = f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉"
     else:
-        await context.bot.send_chat_action(chat_id=query.message.chat_id, action="typing")
-
         aciklama = client.messages.create(
             model="claude-haiku-4-5",
-            max_tokens=300,
+            max_tokens=150,
             messages=[{
                 "role": "user",
-                "content": f"""{sinav} sorusunda kullanıcı {kullanici_cevabi} seçti ama doğru cevap {dogru_cevap}.
+                "content": f"""{sinav} sorusunda kullanıcı {kullanici_cevabi} seçti, doğru cevap {dogru_cevap}.
 Soru: {soru}
-Neden yanlış yaptığını kısaca açıkla, doğru cevabı anlat. 3-4 cümle yeter."""
+Her şık için 1 cümleyle neden doğru/yanlış olduğunu yaz. Çok kısa tut."""
             }]
         ).content[0].text
 
-        await query.edit_message_text(
+        mesaj = (
             f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n"
-            f"❌ *Yanlış!* Seçtiğin: {kullanici_cevabi}\n"
-            f"✅ *Doğru: {dogru_cevap}*\n\n"
-            f"📝 {aciklama}",
-            parse_mode="Markdown"
+            f"❌ Yanlış! Seçtiğin: {kullanici_cevabi}\n"
+            f"✅ Doğru: {dogru_cevap}\n\n"
+            f"📝 {aciklama}"
         )
 
-    # Sıradaki soru var mı?
+    await query.edit_message_text(mesaj)
+
     if index + 1 < toplam:
         await _soru_gonder(query.message.chat_id, context, index + 1)
     else:
@@ -444,6 +462,7 @@ async def _menu_goster(update: Update, sinav: str):
         ],
         [
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),  # ← yeni
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
