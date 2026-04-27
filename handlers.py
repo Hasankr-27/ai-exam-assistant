@@ -356,7 +356,6 @@ DOGRU_CEVAP: (sadece harf)"""
 
 
 async def _soru_gonder(chat_id, context, index):
-    """Belirtilen indexdeki soruyu gönderir."""
     soru = context.user_data.get(f"soru_{index}", "")
     toplam = context.user_data.get("toplam_soru", 1)
 
@@ -373,7 +372,7 @@ async def _soru_gonder(chat_id, context, index):
         chat_id=chat_id,
         text=f"📊 Soru {index+1}/{toplam}\n\n{soru}",
         reply_markup=reply_markup,
-        parse_mode="Markdown"
+
     )
 
 
@@ -398,7 +397,6 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sonuc = f"✅ *Doğru! Tebrikler* 🎉"
         await query.edit_message_text(
             f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n{sonuc}",
-            parse_mode="Markdown"
         )
     else:
         await context.bot.send_chat_action(chat_id=query.message.chat_id, action="typing")
