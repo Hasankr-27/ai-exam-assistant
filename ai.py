@@ -11,14 +11,9 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 # ───────────────────────────────────────────
 
 def intent_kontrol(mesaj: str) -> bool:
-    """
-    Kullanıcının mesajının sınav konularıyla ilgili olup olmadığını kontrol eder.
-    True  → ilgili, cevap verilebilir
-    False → alakasız, reddedilmeli
-    """
     try:
         response = client.messages.create(
-            model="claude-3-5-haiku-20241022", # DÜZELTİLDİ
+            model="claude-4-5-haiku-20251001",
             max_tokens=10,
             messages=[
                 {
@@ -35,7 +30,7 @@ Mesaj: {mesaj}"""
         return cevap == "EVET"
     except Exception as e:
         print(f"Intent Filtre Hatası: {e}")
-        return True # API anlık kopsa bile bot çalışmaya devam etsin
+        return True
 
 
 # ───────────────────────────────────────────
@@ -43,83 +38,50 @@ Mesaj: {mesaj}"""
 # ───────────────────────────────────────────
 
 SISTEM_PROMPTLARI = {
-    "YKS": """Sen YKS (Üniversite Giriş Sınavı) konusunda uzman bir öğretmensin.
-Türkçe, Matematik, Fizik, Kimya, Biyoloji, Tarih, Coğrafya, Felsefe konularında yardımcı olursun.
-Konu anlatımlarını kısa ve öz tut. Formülleri ve önemli noktaları vurgula.
-Sadece YKS ile ilgili sorulara cevap ver.""",
-
-    "KPSS": """Sen KPSS (Kamu Personeli Seçme Sınavı) konusunda uzman bir öğretmensin.
-Genel Yetenek, Genel Kültür, Eğitim Bilimleri konularında yardımcı olursun.
-Konu anlatımlarını kısa ve öz tut. Önemli noktaları ve sık çıkan konuları vurgula.
-Sadece KPSS ile ilgili sorulara cevap ver.""",
-
-    "DGS": """Sen DGS (Dikey Geçiş Sınavı) konusunda uzman bir öğretmensin.
-Sayısal ve Sözel bölüm konularında yardımcı olursun.
-Konu anlatımlarını kısa ve öz tut. Temel kavramları ve formülleri vurgula.
-Sadece DGS ile ilgili sorulara cevap ver.""",
-
-    "ALES": """Sen ALES (Akademik Lisansüstü Eğitim Sınavı) konusunda uzman bir öğretmensin.
-Sayısal ve Sözel bölüm konularında yardımcı olursun.
-Konu anlatımlarını kısa ve öz tut. Önemli noktaları vurgula.
-Sadece ALES ile ilgili sorulara cevap ver.""",
-
-"DIGER": """Sen tüm ÖSYM sınavları konusunda uzman bir öğretmensin.
-YDT, AGS, LGS, MSÜ ve diğer tüm ÖSYM sınavlarında yardımcı olursun.
-Konu anlatımlarını kısa ve öz tut. Önemli noktaları vurgula.
-Sadece sınav konularıyla ilgili sorulara cevap ver."""
-
+    "YKS": "Sen YKS uzmanı bir öğretmensin. Türkçe, Matematik, Fen ve Sosyal konularında kısa, öz ve formül odaklı yardımcı olursun.",
+    "KPSS": "Sen KPSS uzmanı bir öğretmensin. Genel Yetenek, Kültür ve Eğitim Bilimleri konularında önemli noktaları vurgularsın.",
+    "DGS": "Sen DGS uzmanı bir öğretmensin. Sayısal ve Sözel mantık konularında temel kavramları vurgularsın.",
+    "ALES": "Sen ALES uzmanı bir öğretmensin. Akademik seviyede sayısal ve sözel mantık analizi yaparsın.",
+    "DIGER": "Sen tüm ÖSYM sınavları konusunda uzman bir öğretmensin. Müfredata uygun kısa ve öz anlatım yaparsın."
 }
 
-
 def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
-    """
-    Kullanıcının mesajına AI cevabı üretir.
-    """
+    # Hatayı düzelten kısım: Değişkenleri tanımlıyoruz
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["YKS"])
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
 
-    # DÜZELTİLDİ: Abonelere 3.5 Sonnet, ücretsizlere 3.5 Haiku
-    model = "claude-3-5-sonnet-20241022" if abone_mi else "claude-3-5-haiku-20241022"
+    # 🚨 Ücretsizlere Haiku 4.5, Abonelere Sonnet 4.5
+    model_adi = "claude-4-5-sonnet-20251001" if abone_mi else "claude-4-5-haiku-20251001"
 
     response = client.messages.create(
-        model=model,
+        model=model_adi,
         max_tokens=1000,
         system=sistem,
         messages=mesajlar
     )
-
     return response.content[0].text
 
 
 # ───────────────────────────────────────────
-# YENİ SORU HAZIRLA (Profesyonel ÖSYM Modu)
+# SORU HAZIRLA (Profesyonel ÖSYM Modu)
 # ───────────────────────────────────────────
 
 def soru_hazirla(sinav_turu: str, ders: str, konu: str, adet: int, abone_mi: bool = False) -> str:
-    """
-    Kullanıcının seçtiği sınav, ders, konu ve adete göre soru üretir.
-    """
-    # DÜZELTİLDİ: Abonelere 3.5 Sonnet, ücretsizlere 3.5 Haiku
-    model_adi = "claude-3-5-sonnet-20241022" if abone_mi else "claude-3-5-haiku-20241022"
+    # 🚨 Soru hazırlarken de aynı denge geçerli
+    model_adi = "claude-4-5-sonnet-20251001" if abone_mi else "claude-4-5-haiku-20251001"
 
     prompt = f"""Sen profesyonel bir {sinav_turu} uzmanısın.
-Lütfen {sinav_turu} müfredatına uygun olarak, {ders} dersinin {konu} konusundan tam {adet} adet farklı çoktan seçmeli soru hazırla.
+Lütfen {sinav_turu} müfredatına uygun olarak, {ders} dersinin {konu} konusundan tam {adet} adet çoktan seçmeli soru hazırla.
 
 ÖNEMLİ KURALLAR:
-1. Sorular ne çok kolay ne de gereksiz zor olsun, tam ÖSYM sınav formatında olsun.
+1. Sorular yeni nesil ÖSYM formatında olsun.
 2. Önce soruyu ver, şıkları (A, B, C, D, E) sırala.
-3. Her sorunun hemen altında adım adım, açıklayıcı bir "Çözüm" ve "Doğru Cevap" bulunsun.
-4. Sadece soruları ve çözümleri ver, gereksiz sohbete girme."""
+3. Her sorunun hemen altında detaylı "Çözüm" ve "Doğru Cevap" bulunsun."""
 
     response = client.messages.create(
         model=model_adi,
         max_tokens=2500,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+        messages=[{"role": "user", "content": prompt}]
     )
     return response.content[0].text
 

@@ -214,6 +214,7 @@ async def adet_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # Seçimleri al
     adet = int(query.data.replace("adet_", ""))
     sinav = context.user_data.get("sinav_turu", "YKS")
     ders = context.user_data.get("secilen_ders", "Matematik")
@@ -223,7 +224,7 @@ async def adet_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     durum = kullanici_durumu(user_id)
     abone_mi = durum["abone_mi"]
 
-    # Hak kontrolü (Yapay zekaya gitmeden önce)
+    # 1) Hak Kontrolü
     if not abone_mi and durum["kalan_hak"] <= 0:
         await query.edit_message_text(ABONELIK_MESAJI)
         return
@@ -231,26 +232,51 @@ async def adet_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(LIMIT_MESAJI)
         return
 
+    # 2) Bekleme Mesajı
     await query.edit_message_text(
-        f"🚀 {sinav} uzmanımız {adet} adet {ders} - {konu} sorusunu hazırlıyor...\n\nLütfen bekle...")
+        f"🚀 *{sinav} Uzmanı* sizin için hazırlıyor...\n\n"
+        f"📚 *Ders:* {ders}\n"
+        f"🎯 *Konu:* {konu}\n"
+        f"📝 *Adet:* {adet}\n\n"
+        "_Lütfen bekleyin, sorular yükleniyor..._",
+        parse_mode="Markdown"
+    )
 
     try:
-        cevap = soru_hazirla(sinav_turu=sinav, ders=ders, konu=konu, adet=adet, abone_mi=abone_mi)
+        # 3) Yapay Zekayı Çağır (ai.py'deki yeni fonksiyonun)
+        cevap = soru_hazirla(
+            sinav_turu=sinav,
+            ders=ders,
+            konu=konu,
+            adet=adet,
+            abone_mi=abone_mi
+        )
 
-        # Hakları düş
+        # 4) Hakları Düş
         if not abone_mi:
             kalan_hak_azalt(user_id)
         else:
             gunluk_mesaj_artir(user_id)
 
-        await context.bot.send_message(chat_id=query.message.chat_id, text=cevap)
-        context.user_data["durum"] = "BOSTA"  # İşlem bitti
-        await _menu_goster(update, sinav)  # Menüyü geri çağır
+        # 5) Soruları Gönder (Markdown desteğiyle)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=cevap,
+            parse_mode="Markdown"
+        )
+
+        # 6) Durumu Sıfırla ve Menüyü Göster
+        context.user_data["durum"] = "BOSTA"
+        # query üzerinden menüyü çağırmak daha sağlıklıdır
+        await _menu_goster(query, sinav)
 
     except Exception as e:
-        await context.bot.send_message(chat_id=query.message.chat_id, text="Sistem yoğun kanka, birazdan tekrar dene!")
+        print(f"🚨 Soru Hazırlama Hatası: {e}")
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="⚠️ Kanka Claude şu an çok yoğun, soruları hazırlayamadı. Lütfen az sonra tekrar dene!"
+        )
         context.user_data["durum"] = "BOSTA"
-        print(f"Soru Hazırlama Hatası: {e}")
 
 
 # ───────────────────────────────────────────
@@ -269,9 +295,12 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         keyboard = [[InlineKeyboardButton(str(i), callback_data=f"adet_{i}") for i in range(1, 6)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"🎯 Konu: {metin}\n\nKaç tane soru hazırlayayım? (Maksimum 5)",
-                                        reply_markup=reply_markup)
-        return  # Normal AI akışına girmemesi için işlemi kesiyoruz
+        await update.message.reply_text(
+            f"🎯 *Konu:* {metin}\n\nKaç tane soru hazırlayayım kanka? (Maksimum 5)",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        return  # Normal AI akışına girmemesi için işlemi burada bitiriyoruz
 
     # 1) Rate limit kontrolü
     simdi = time.time()
@@ -306,12 +335,11 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-        # 7) Intent filtre
-        if not intent_kontrol(metin):
-            await update.message.reply_text(ALAKASIZ_MESAJ)
-
-            await _menu_goster(update, durum["sinav_turu"])
-            return
+    # 7) Intent filtre (Girinti hatası buradaydı, düzelttim!)
+    if not intent_kontrol(metin):
+        await update.message.reply_text(ALAKASIZ_MESAJ)
+        await _menu_goster(update, durum["sinav_turu"])
+        return
 
     # 8) "Yazıyor..." göster
     await context.bot.send_chat_action(
@@ -335,9 +363,9 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kalan_hak_azalt(user_id)
             kalan = durum["kalan_hak"] - 1
             if kalan == 1:
-                cevap += "\n\n⚠️ *Son ücretsiz hakkın!* Devam için /abone yaz."
-            elif kalan == 0:
-                cevap += "\n\n⛔ *Ücretsiz hakkın bitti.* Devam için /abone yaz."
+                cevap += "\n\n⚠️ *Son ücretsiz hakkın!* Devam için /paketler yaz."
+            elif kalan <= 0:
+                cevap += "\n\n⛔ *Ücretsiz hakkın bitti.* Devam için /paketler yaz."
         else:
             gunluk_mesaj_artir(user_id)
 
@@ -346,8 +374,8 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _menu_goster(update, sinav)
 
     except Exception as e:
+        print(f"Hata detayı: {e}")
         await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
-        print(f"Hata: {e}")
 
 
 # ───────────────────────────────────────────
@@ -487,9 +515,11 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         foto_base64 = base64.standard_b64encode(bytes(foto_bytes)).decode("utf-8")
         sinav = durum["sinav_turu"] or "ÖSYM"
 
+
         response = client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-4-5-haiku-20251001",
             max_tokens=1000,
+
             messages=[{
                 "role": "user",
                 "content": [
