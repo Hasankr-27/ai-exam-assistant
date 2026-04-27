@@ -4,7 +4,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# API Key kontrolü (Eğer boşsa terminalde bağırır)
+api_key = os.getenv("ANTHROPIC_API_KEY")
+if not api_key:
+    print("🚨 HATA: ANTHROPIC_API_KEY bulunamadı! .env dosyanı kontrol et.")
+
+client = Anthropic(api_key=api_key)
+
+# ───────────────────────────────────────────
+# MODELLER (Senin attığın dökümana göre güncel)
+# ───────────────────────────────────────────
+MODEL_HAIKU = "claude-haiku-4-5-20251001"
+MODEL_SONNET = "claude-sonnet-4-5-20250929"  # Dökümandaki en güncel Sonnet 4.5
+
 
 # ───────────────────────────────────────────
 # INTENT FILTER
@@ -13,77 +25,64 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 def intent_kontrol(mesaj: str) -> bool:
     try:
         response = client.messages.create(
-            model="claude-4-5-haiku-20251001",
+            model=MODEL_HAIKU,
             max_tokens=10,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS).
-Kullanıcının mesajı sınav konularıyla ilgili mi?
-Sadece "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma.
-
-Mesaj: {mesaj}"""
-                }
-            ]
+            messages=[{"role": "user", "content": f"Sınavla ilgili mi? Sadece EVET/HAYIR: {mesaj}"}]
         )
-        cevap = response.content[0].text.strip().upper()
-        return cevap == "EVET"
+        return "EVET" in response.content[0].text.upper()
     except Exception as e:
-        print(f"Intent Filtre Hatası: {e}")
+        print(f"Intent Hatası: {e}")
         return True
 
 
 # ───────────────────────────────────────────
-# ANA AI FONKSİYONU
+# ANA AI FONKSİYONU (Sohbet İçin)
 # ───────────────────────────────────────────
-
-SISTEM_PROMPTLARI = {
-    "YKS": "Sen YKS uzmanı bir öğretmensin. Türkçe, Matematik, Fen ve Sosyal konularında kısa, öz ve formül odaklı yardımcı olursun.",
-    "KPSS": "Sen KPSS uzmanı bir öğretmensin. Genel Yetenek, Kültür ve Eğitim Bilimleri konularında önemli noktaları vurgularsın.",
-    "DGS": "Sen DGS uzmanı bir öğretmensin. Sayısal ve Sözel mantık konularında temel kavramları vurgularsın.",
-    "ALES": "Sen ALES uzmanı bir öğretmensin. Akademik seviyede sayısal ve sözel mantık analizi yaparsın.",
-    "DIGER": "Sen tüm ÖSYM sınavları konusunda uzman bir öğretmensin. Müfredata uygun kısa ve öz anlatım yaparsın."
-}
 
 def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
-    # Hatayı düzelten kısım: Değişkenleri tanımlıyoruz
-    sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["YKS"])
-    mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
+    try:
+        model_adi = MODEL_SONNET if abone_mi else MODEL_HAIKU
 
-    # 🚨 Ücretsizlere Haiku 4.5, Abonelere Sonnet 4.5
-    model_adi = "claude-4-5-sonnet-20251001" if abone_mi else "claude-4-5-haiku-20251001"
+        # Sistem promptu
+        sistem = f"Sen bir {sinav_turu} uzmanısın. Kısa ve net cevaplar ver."
 
-    response = client.messages.create(
-        model=model_adi,
-        max_tokens=1000,
-        system=sistem,
-        messages=mesajlar
-    )
-    return response.content[0].text
+        # Mesajları hazırla
+        mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
+
+        response = client.messages.create(
+            model=model_adi,
+            max_tokens=1000,
+            system=sistem,
+            messages=mesajlar
+        )
+        return response.content[0].text
+    except Exception as e:
+        print(f"AI Cevap Hatası: {e}")
+        return "⚠️ Mesajını şu an cevaplayamıyorum kanka, API bağlantısında bir sorun var."
 
 
 # ───────────────────────────────────────────
-# SORU HAZIRLA (Profesyonel ÖSYM Modu)
+# SORU HAZIRLA (Hatanın Kaynağı Burasıydı!)
 # ───────────────────────────────────────────
 
 def soru_hazirla(sinav_turu: str, ders: str, konu: str, adet: int, abone_mi: bool = False) -> str:
-    # 🚨 Soru hazırlarken de aynı denge geçerli
-    model_adi = "claude-4-5-sonnet-20251001" if abone_mi else "claude-4-5-haiku-20251001"
+    try:
+        # 🚨 Dökümandaki tam model isimlerini kullanıyoruz
+        model_adi = MODEL_SONNET if abone_mi else MODEL_HAIKU
 
-    prompt = f"""Sen profesyonel bir {sinav_turu} uzmanısın.
-Lütfen {sinav_turu} müfredatına uygun olarak, {ders} dersinin {konu} konusundan tam {adet} adet çoktan seçmeli soru hazırla.
+        prompt = f"""Profesyonel {sinav_turu} uzmanı olarak, {ders} dersinin {konu} konusundan {adet} adet soru hazırla.
+        Format: Soru, şıklar ve çözüm mutlaka olsun."""
 
-ÖNEMLİ KURALLAR:
-1. Sorular yeni nesil ÖSYM formatında olsun.
-2. Önce soruyu ver, şıkları (A, B, C, D, E) sırala.
-3. Her sorunun hemen altında detaylı "Çözüm" ve "Doğru Cevap" bulunsun."""
-
-    response = client.messages.create(
-        model=model_adi,
-        max_tokens=2500,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.content[0].text
+        response = client.messages.create(
+            model=model_adi,
+            max_tokens=2500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text
+    except Exception as e:
+        # Hatayı terminalde görmek için burası çok önemli!
+        print(f"🚨 Soru Hazırlama API Hatası: {e}")
+        raise e  # Hatayı yukarı fırlat ki handlers.py'deki 'except' bloğu çalışsın
 
 
 # ───────────────────────────────────────────
