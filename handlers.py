@@ -1,9 +1,12 @@
 from collections import defaultdict
 import time
+import os
+import base64
 
 from anthropic import Anthropic
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from dotenv import load_dotenv
 
 from database import (
     kullanici_olustur,
@@ -13,9 +16,9 @@ from database import (
     gunluk_mesaj_kontrol,
     gunluk_mesaj_artir,
 )
-from ai import intent_kontrol, ai_cevap_al
-import os
-from dotenv import load_dotenv
+
+# YENİ FONKSİYONU DA BURAYA EKLEDİK (soru_hazirla)
+from ai import intent_kontrol, ai_cevap_al, soru_hazirla
 
 load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -32,10 +35,10 @@ BEKLEME_SURESI = 3  # saniye
 # ───────────────────────────────────────────
 
 HAZIR_CEVAPLAR = {
-    "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
-    "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 **Güncel Abonelik Paketleri:**\n\n• 1 Aylık Premium: 100 ⭐\n• 3 Aylık Premium: 250 ⭐ (Avantajlı Paket!)\n\nDetaylar ve satın alma için /paketler komutunu kullanabilirsin.",
-    "ucret":      "💳 **Abonelik Ücretleri:**\n\nSana özel 1 Aylık sadece 100 Yıldız! 🌟 Günde 3 Yıldız'dan bile ucuza geliyor. Hemen denemek için /paketler yaz.",
+    "merhaba": "👋 Merhaba! /start yazarak başlayabilirsin.",
+    "selam": "👋 Selam! /start yazarak başlayabilirsin.",
+    "fiyat": "💳 **Güncel Abonelik Paketleri:**\n\n• 1 Aylık Premium: 100 ⭐\n• 3 Aylık Premium: 250 ⭐ (Avantajlı Paket!)\n\nDetaylar ve satın alma için /paketler komutunu kullanabilirsin.",
+    "ucret": "💳 **Abonelik Ücretleri:**\n\nSana özel 1 Aylık sadece 100 Yıldız! 🌟 Günde 3 Yıldız'dan bile ucuza geliyor. Hemen denemek için /paketler yaz.",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında yardımcı olan bir sınav asistanıyım!",
 }
 
@@ -100,6 +103,7 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     sinav = query.data.replace("sinav_", "")
     sinav_turu_guncelle(user_id, sinav)
+    context.user_data["sinav_turu"] = sinav  # Sınavı hafızada tutuyoruz
 
     keyboard = [
         [
@@ -128,10 +132,34 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     islem = query.data.replace("islem_", "")
+    sinav = context.user_data.get("sinav_turu", "YKS")
 
+    # YENİ SİSTEM: Soru hazırlama seçildiyse dersleri listele
+    if islem == "soru":
+        dersler_sozlugu = {
+            "YKS": ["Matematik", "Türkçe", "Fizik", "Kimya", "Biyoloji", "Tarih", "Coğrafya"],
+            "KPSS": ["Matematik", "Türkçe", "Tarih", "Coğrafya", "Vatandaşlık", "Eğitim Bilimleri"],
+            "DGS": ["Matematik", "Türkçe"],
+            "ALES": ["Matematik", "Türkçe"]
+        }
+
+        aktif_dersler = dersler_sozlugu.get(sinav, ["Genel Yetenek", "Genel Kültür"])
+        keyboard = []
+
+        for i in range(0, len(aktif_dersler), 2):
+            satir = [InlineKeyboardButton(aktif_dersler[i], callback_data=f"ders_{aktif_dersler[i]}")]
+            if i + 1 < len(aktif_dersler):
+                satir.append(InlineKeyboardButton(aktif_dersler[i + 1], callback_data=f"ders_{aktif_dersler[i + 1]}"))
+            keyboard.append(satir)
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(f"📚 {sinav} sınavı için hangi dersten soru hazırlayayım?",
+                                      reply_markup=reply_markup)
+        return  # İşlemi burada kesiyoruz ki mesajlar sözlüğüne girmesin
+
+    # Diğer normal işlemler
     mesajlar = {
         "konu": "📖 Hangi konuyu anlatmamı istersin?\nÖrnek: *türev*, *Atatürk ilkeleri*, *integral*",
-        "soru": "❓ Hangi konuda soru hazırlayayım?\nÖrnek: *limit*, *Osmanlı tarihi*, *paragraf*",
         "plan": "📅 Sınava kaç günün var ve günde kaç saat çalışabilirsin?\nÖrnek: *60 gün, 4 saat*",
         "sor": "💬 Aklındaki soruyu yaz, cevaplayayım!\nÖrnek: *türev ne işe yarar*, *KPSS'de en çok hangi konular çıkıyor*",
     }
@@ -145,126 +173,148 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────────────────────────
+# YENİ: DERS SEÇİLDİ (callback)
+# ───────────────────────────────────────────
+
+async def ders_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    secilen_ders = query.data.replace("ders_", "")
+    context.user_data["secilen_ders"] = secilen_ders
+    context.user_data["durum"] = "KONU_BEKLENIYOR"  # Bot artık konuyu bekleyecek
+
+    await query.edit_message_text(
+        f"✅ Ders: **{secilen_ders}**\n\n"
+        "Şimdi bana hangi konudan soru istediğini yaz.\n"
+        "(Örn: Limit, Paragrafta Anlam, Kurtuluş Savaşı...)",
+        parse_mode="Markdown"
+    )
+
+
+# ───────────────────────────────────────────
+# YENİ: ADET SEÇİLDİ (callback) -> AI TETİKLENİR
+# ───────────────────────────────────────────
+
+async def adet_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    adet = int(query.data.replace("adet_", ""))
+    sinav = context.user_data.get("sinav_turu", "YKS")
+    ders = context.user_data.get("secilen_ders", "Matematik")
+    konu = context.user_data.get("secilen_konu", "Genel")
+
+    user_id = update.effective_user.id
+    durum = kullanici_durumu(user_id)
+    abone_mi = durum["abone_mi"]
+
+    # Hak kontrolü (Yapay zekaya gitmeden önce)
+    if not abone_mi and durum["kalan_hak"] <= 0:
+        await query.edit_message_text(ABONELIK_MESAJI)
+        return
+    if abone_mi and not gunluk_mesaj_kontrol(user_id):
+        await query.edit_message_text(LIMIT_MESAJI)
+        return
+
+    await query.edit_message_text(
+        f"🚀 {sinav} uzmanımız {adet} adet {ders} - {konu} sorusunu hazırlıyor...\n\nLütfen bekle...")
+
+    try:
+        cevap = soru_hazirla(sinav_turu=sinav, ders=ders, konu=konu, adet=adet, abone_mi=abone_mi)
+
+        # Hakları düş
+        if not abone_mi:
+            kalan_hak_azalt(user_id)
+        else:
+            gunluk_mesaj_artir(user_id)
+
+        await context.bot.send_message(chat_id=query.message.chat_id, text=cevap)
+        context.user_data["durum"] = "BOSTA"  # İşlem bitti
+        await _menu_goster(update, sinav)  # Menüyü geri çağır
+
+    except Exception as e:
+        await context.bot.send_message(chat_id=query.message.chat_id, text="Sistem yoğun kanka, birazdan tekrar dene!")
+        context.user_data["durum"] = "BOSTA"
+        print(f"Soru Hazırlama Hatası: {e}")
+
+
+# ───────────────────────────────────────────
 # MESAJ HANDLER (ana akış)
 # ───────────────────────────────────────────
 
 async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    metin = update.message.text.lower().strip()
+    metin = update.message.text.strip()
+    metin_lower = metin.lower()
 
-    # 0) Rate limit kontrolü
+    # 0) YENİ SİSTEM: Konu bekleme durumu yakalayıcısı
+    if context.user_data.get("durum") == "KONU_BEKLENIYOR":
+        context.user_data["secilen_konu"] = metin
+        context.user_data["durum"] = "ADET_BEKLENIYOR"
+
+        keyboard = [[InlineKeyboardButton(str(i), callback_data=f"adet_{i}") for i in range(1, 6)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(f"🎯 Konu: {metin}\n\nKaç tane soru hazırlayayım? (Maksimum 5)",
+                                        reply_markup=reply_markup)
+        return  # Normal AI akışına girmemesi için işlemi kesiyoruz
+
+    # 1) Rate limit kontrolü
     simdi = time.time()
     if simdi - son_mesaj_zamani[user_id] < BEKLEME_SURESI:
         await update.message.reply_text("⏳ Çok hızlı! Lütfen 3 saniye bekle.")
         return
     son_mesaj_zamani[user_id] = simdi
 
-    # 1) Hazır cevap var mı?
-    if metin in HAZIR_CEVAPLAR:
-        await update.message.reply_text(HAZIR_CEVAPLAR[metin])
+    # 2) Hazır cevap var mı?
+    if metin_lower in HAZIR_CEVAPLAR:
+        await update.message.reply_text(HAZIR_CEVAPLAR[metin_lower])
         return
 
-    # 2) Kullanıcıyı oluştur / getir
+    # 3) Kullanıcıyı oluştur / getir
     kullanici_olustur(user_id)
     durum = kullanici_durumu(user_id)
 
-    # 3) Sınav türü seçilmiş mi?
+    # 4) Sınav türü seçilmiş mi?
     if not durum["sinav_turu"]:
         await update.message.reply_text(
             "⚠️ Önce sınav türünü seç!\n/start yazarak başlayabilirsin."
         )
         return
 
-    # 4) Ücretsiz hak kontrolü
+    # 5) Ücretsiz hak kontrolü
     if not durum["abone_mi"] and durum["kalan_hak"] <= 0:
         await update.message.reply_text(ABONELIK_MESAJI)
         return
 
-    # 5) Günlük limit kontrolü (sadece aboneler için)
+    # 6) Günlük limit kontrolü (sadece aboneler için)
     if durum["abone_mi"] and not gunluk_mesaj_kontrol(user_id):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-    # 6) Intent filtre
+    # 7) Intent filtre
     if not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
         return
 
-    # 7) "Yazıyor..." göster
+    # 8) "Yazıyor..." göster
     await context.bot.send_chat_action(
         chat_id=update.effective_chat.id,
         action="typing"
     )
 
-    # 8) AI'a gönder
-    beklenen = context.user_data.get("beklenen_islem", "genel")
+    # 9) Normal AI Muhabbeti (Konu, Plan, Soru Sor vb.)
     sinav = durum["sinav_turu"]
 
     try:
-        if beklenen == "soru":
-            # Soruyu üret, cevabı ayrı al
-            soru_response = client.messages.create(
-                model="claude-haiku-4-5",
-                max_tokens=600,
-                messages=[{
-                    "role": "user",
-                    "content": f"""{sinav} sınavı için {metin} konusunda 1 çoktan seçmeli soru hazırla.
-Format:
-❓ Soru: ...
-A) ...
-B) ...
-C) ...
-D) ...
-E) ...
-DOGRU_CEVAP: (sadece harf)
+        gecmis = context.user_data.get("sohbet_gecmisi", [])
+        cevap = ai_cevap_al(metin, sinav, gecmis, durum["abone_mi"])
 
-Cevabı açıklama, sadece DOGRU_CEVAP satırını ekle."""
-                }]
-            ).content[0].text
+        gecmis.append({"role": "user", "content": metin})
+        gecmis.append({"role": "assistant", "content": cevap})
+        context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
-            # Doğru cevabı ayır
-            satirlar = soru_response.strip().split("\n")
-            dogru_cevap_satiri = [s for s in satirlar if s.startswith("DOGRU_CEVAP:")]
-            dogru_cevap = dogru_cevap_satiri[0].replace("DOGRU_CEVAP:", "").strip() if dogru_cevap_satiri else "A"
-            soru_metni = "\n".join([s for s in satirlar if not s.startswith("DOGRU_CEVAP:")])
-
-            # Context'e kaydet
-            context.user_data["dogru_cevap"] = dogru_cevap
-            context.user_data["son_soru"] = soru_metni
-            context.user_data["beklenen_islem"] = None
-
-            # Şık butonları
-            keyboard = [[
-                InlineKeyboardButton("A", callback_data="cevap_A"),
-                InlineKeyboardButton("B", callback_data="cevap_B"),
-                InlineKeyboardButton("C", callback_data="cevap_C"),
-                InlineKeyboardButton("D", callback_data="cevap_D"),
-                InlineKeyboardButton("E", callback_data="cevap_E"),
-            ]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await update.message.reply_text(
-                soru_metni,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
-            )
-
-            # Hak güncelle
-            if not durum["abone_mi"]:
-                kalan_hak_azalt(user_id)
-            else:
-                gunluk_mesaj_artir(user_id)
-            return
-
-        else:
-            gecmis = context.user_data.get("sohbet_gecmisi", [])
-            cevap = ai_cevap_al(metin, sinav, gecmis)
-
-            gecmis.append({"role": "user", "content": metin})
-            gecmis.append({"role": "assistant", "content": cevap})
-            context.user_data["sohbet_gecmisi"] = gecmis[-10:]
-
-        # 9) Hak / sayaç güncelle
+        # 10) Hak / sayaç güncelle
         if not durum["abone_mi"]:
             kalan_hak_azalt(user_id)
             kalan = durum["kalan_hak"] - 1
@@ -275,14 +325,12 @@ Cevabı açıklama, sadece DOGRU_CEVAP satırını ekle."""
         else:
             gunluk_mesaj_artir(user_id)
 
-        # 10) Cevabı gönder + menüyü tekrar göster
+        # 11) Cevabı gönder + menüyü tekrar göster
         await update.message.reply_text(cevap, parse_mode="Markdown")
         await _menu_goster(update, sinav)
 
     except Exception as e:
-        await update.message.reply_text(
-            "⚠️ Bir hata oluştu, tekrar dener misin?"
-        )
+        await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
         print(f"Hata: {e}")
 
 
@@ -291,13 +339,16 @@ Cevabı açıklama, sadece DOGRU_CEVAP satırını ekle."""
 # ───────────────────────────────────────────
 
 async def _menu_goster(update: Update, sinav: str):
+    # Eğer update bir callback_query ise mesajı göndermek için query.message kullanmalıyız
+    is_callback = hasattr(update, "callback_query") and update.callback_query is not None
+
     keyboard = [
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
-            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),  # ← yeni
+            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
         [
@@ -305,10 +356,13 @@ async def _menu_goster(update: Update, sinav: str):
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        f"📚 {sinav} — Başka ne yapmak istersin?",
-        reply_markup=reply_markup,
-    )
+
+    text = f"📚 {sinav} — Başka ne yapmak istersin?"
+
+    if is_callback:
+        await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup)
 
 
 # ───────────────────────────────────────────
@@ -341,7 +395,7 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────────────────────────
-# CEVAP KONTROL (callback)
+# ESKİ CEVAP KONTROL (Şu an kullanılmıyor ama kalsın)
 # ───────────────────────────────────────────
 
 async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -365,7 +419,7 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         aciklama = client.messages.create(
-            model="claude-haiku-4-5",
+            model="claude-3-5-haiku-20241022",
             max_tokens=300,
             messages=[{
                 "role": "user",
@@ -383,6 +437,7 @@ Neden yanlış yaptığını kısaca açıkla ve doğru cevabı anlat. 3-4 cüml
             parse_mode="Markdown"
         )
 
+
 # ───────────────────────────────────────────
 # FOTOĞRAF İŞLEME (abonelere özel)
 # ───────────────────────────────────────────
@@ -392,7 +447,6 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kullanici_olustur(user_id)
     durum = kullanici_durumu(user_id)
 
-    # Sadece aboneler kullanabilir
     if not durum["abone_mi"]:
         await update.message.reply_text(
             "📸 Fotoğrafla soru çözme sadece abonelere özel!\n"
@@ -400,7 +454,6 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Günlük limit kontrolü
     if not gunluk_mesaj_kontrol(user_id):
         await update.message.reply_text(LIMIT_MESAJI)
         return
@@ -411,20 +464,15 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        # Fotoğrafı indir
-        foto = update.message.photo[-1]  # en yüksek kaliteli
+        foto = update.message.photo[-1]
         foto_dosyasi = await context.bot.get_file(foto.file_id)
         foto_bytes = await foto_dosyasi.download_as_bytearray()
 
-        # Base64'e çevir
-        import base64
         foto_base64 = base64.standard_b64encode(bytes(foto_bytes)).decode("utf-8")
-
         sinav = durum["sinav_turu"] or "ÖSYM"
 
-        # Claude'a gönder
         response = client.messages.create(
-            model="claude-haiku-4-5",
+            model="claude-4-5-haiku",
             max_tokens=1000,
             messages=[{
                 "role": "user",

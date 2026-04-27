@@ -21,6 +21,8 @@ from handlers import (
     sinav_degistir,
     cevap_kontrol,
     fotograf_isle,
+    ders_secildi,
+    adet_secildi
 )
 from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi
 
@@ -44,6 +46,8 @@ def main():
     app.add_handler(CallbackQueryHandler(sinav_degistir, pattern="^sinav_degistir$"))
     app.add_handler(CallbackQueryHandler(islem_sec,      pattern="^islem_(konu|soru|plan|sor)$"))
     app.add_handler(CallbackQueryHandler(cevap_kontrol, pattern="^cevap_(A|B|C|D|E)$"))
+    app.add_handler(CallbackQueryHandler(ders_secildi, pattern="^ders_"))
+    app.add_handler(CallbackQueryHandler(adet_secildi, pattern="^adet_"))
 
     # ── Ödeme ─────────────────────────────────
     app.add_handler(PreCheckoutQueryHandler(on_odeme_kontrol))

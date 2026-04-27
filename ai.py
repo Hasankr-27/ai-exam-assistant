@@ -17,7 +17,7 @@ def intent_kontrol(mesaj: str) -> bool:
     False → alakasız, reddedilmeli
     """
     response = client.messages.create(
-        model="claude-haiku-4-5",
+        model="claude-4-5-haiku", # Maliyeti düşük olması için Haiku kullanıyoruz
         max_tokens=10,
         messages=[
             {
@@ -68,18 +68,19 @@ Sadece sınav konularıyla ilgili sorulara cevap ver."""
 }
 
 
-def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list) -> str:
+def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
     """
     Kullanıcının mesajına AI cevabı üretir.
     sohbet_gecmisi: [{"role": "user/assistant", "content": "..."}]
     """
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["YKS"])
-
-    # Sohbet geçmişine yeni mesajı ekle
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
 
+    # Abonelere 4.5 Sonnet, ücretsizlere 4.5 Haiku
+    model = "claude-4-5-sonnet" if abone_mi else "claude-4-5-haiku"
+
     response = client.messages.create(
-        model="claude-haiku-4-5",
+        model=model,
         max_tokens=1000,
         system=sistem,
         messages=mesajlar
@@ -89,32 +90,32 @@ def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list) -> str:
 
 
 # ───────────────────────────────────────────
-# SORU HAZIRLA
+# YENİ SORU HAZIRLA (Profesyonel ÖSYM Modu)
 # ───────────────────────────────────────────
 
-def soru_hazirla(konu: str, sinav_turu: str) -> str:
+def soru_hazirla(sinav_turu: str, ders: str, konu: str, adet: int, abone_mi: bool = False) -> str:
+    """
+    Kullanıcının seçtiği sınav, ders, konu ve adete göre soru üretir.
+    """
+    # Abonelere 4.5 Sonnet, ücretsizlere 4.5 Haiku
+    model_adi = "claude-4-5-sonnet" if abone_mi else "claude-4-5-haiku"
+
+    prompt = f"""Sen profesyonel bir {sinav_turu} uzmanısın.
+Lütfen {sinav_turu} müfredatına uygun olarak, {ders} dersinin {konu} konusundan tam {adet} adet farklı çoktan seçmeli soru hazırla.
+
+ÖNEMLİ KURALLAR:
+1. Sorular ne çok kolay ne de gereksiz zor olsun, tam ÖSYM sınav formatında olsun.
+2. Önce soruyu ver, şıkları (A, B, C, D, E) sırala.
+3. Her sorunun hemen altında adım adım, açıklayıcı bir "Çözüm" ve "Doğru Cevap" bulunsun.
+4. Sadece soruları ve çözümleri ver, gereksiz sohbete girme."""
+
     response = client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=600,
+        model=model_adi,
+        max_tokens=2500,  # 5 soru isteyebileceği için limiti yüksek tuttuk
         messages=[
             {
                 "role": "user",
-                "content": f"""{sinav_turu} sınavı için {konu} konusunda 1 çoktan seçmeli soru hazırla.
-
-ÖNEMLİ KURALLAR:
-1. Önce soruyu çöz ve doğru cevabı bul
-2. Doğru cevabın şıklarda olduğundan %100 emin ol
-3. Her adımı iki kez kontrol et
-4. Eğer doğru cevap şıklarda yoksa soruyu baştan yaz
-
-Format:
-❓ Soru: ...
-A) ...
-B) ...
-C) ...
-D) ...
-E) ...
-DOGRU_CEVAP: (sadece harf)"""
+                "content": prompt
             }
         ]
     )
@@ -141,5 +142,6 @@ if __name__ == "__main__":
         print(f"{durum} '{mesaj}' → {'İLGİLİ' if sonuc else 'ALAKASIZ'}")
 
     print("\n📝 Soru Hazırlama Testi:")
-    soru = soru_hazirla("türev", "YKS")
+    # Parametreleri yeni fonksiyona göre güncelledim
+    soru = soru_hazirla("YKS", "Matematik", "Türev", 1, abone_mi=True)
     print(soru)
