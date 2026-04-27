@@ -292,10 +292,12 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-    # 7) Intent filtre
-    if not intent_kontrol(metin):
-        await update.message.reply_text(ALAKASIZ_MESAJ)
-        return
+        # 7) Intent filtre
+        if not intent_kontrol(metin):
+            await update.message.reply_text(ALAKASIZ_MESAJ)
+
+            await _menu_goster(update, durum["sinav_turu"])
+            return
 
     # 8) "Yazıyor..." göster
     await context.bot.send_chat_action(
