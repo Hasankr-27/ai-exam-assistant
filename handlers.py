@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 import time
 import base64
 
@@ -11,8 +12,8 @@ from database import (
     kullanici_durumu,
     sinav_turu_guncelle,
     kalan_hak_azalt,
-    gunluk_mesaj_kontrol,
     gunluk_mesaj_artir,
+    mesaj_hakki_kontrol,
 )
 from ai import intent_kontrol, ai_cevap_al, soru_hazirla, SINAV_DERSLERI
 import os
@@ -219,13 +220,18 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    hak_durumu = mesaj_hakki_kontrol(user_id, durum["abone_mi"])
+
     # 4) Ücretsiz hak kontrolü
-    if not durum["abone_mi"] and durum["kalan_hak"] <= 0:
-        await update.message.reply_text(ABONELIK_MESAJI)
+    if not durum["abone_mi"] and not hak_durumu["izin_ver"]:
+        await update.message.reply_text(
+            "⏰ Bugünlük 7 ücretsiz hakkını doldurdun!\n\n"
+            "Gece 00:00'da hakların otomatik olarak yenilenecek. Hiç beklemeden devam etmek istersen /abone yazarak günlük 70 hakka geçebilirsin! 🚀"
+        )
         return
 
     # 5) Günlük limit kontrolü
-    if durum["abone_mi"] and not gunluk_mesaj_kontrol(user_id):
+    if durum["abone_mi"] and not hak_durumu["izin_ver"]:
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
@@ -271,16 +277,15 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             gecmis.append({"role": "assistant", "content": cevap})
             context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
-        # Hak güncelle
-        if not durum["abone_mi"]:
-            kalan_hak_azalt(user_id)
-            kalan = durum["kalan_hak"] - 1
-            if kalan == 1:
-                cevap += "\n\n⚠️ *Son ücretsiz hakkın!* Devam için /abone yaz."
-            elif kalan == 0:
-                cevap += "\n\n⛔ *Ücretsiz hakkın bitti.* Devam için /abone yaz."
-        else:
+            # Hak güncelle
             gunluk_mesaj_artir(user_id)
+
+            if not durum["abone_mi"]:
+                kalan = hak_durumu["kalan"] - 1
+                if kalan == 1:
+                    cevap += "\n\n⚠️ *Bugünlük son ücretsiz hakkın!* Devam için /abone yaz."
+                elif kalan == 0:
+                    cevap += "\n\n⛔ *Bugünlük ücretsiz hakkın bitti.* Yarın yenilenecek veya /abone yazabilirsin."
 
         await update.message.reply_text(cevap, parse_mode="Markdown")
         await _menu_goster(update, sinav)
@@ -368,10 +373,8 @@ Format tamamen şu şekilde olmalı:
 
         await _soru_gonder(query.message.chat_id, context, 0)
 
-        if not durum["abone_mi"]:
-            kalan_hak_azalt(user_id)
-        else:
-            gunluk_mesaj_artir(user_id)
+        # Herkes için ortak sayacı artır
+        gunluk_mesaj_artir(user_id)
 
     except json.JSONDecodeError:
         await query.edit_message_text(
@@ -541,21 +544,49 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # FOTOĞRAF İŞLEME (abonelere özel)
 # ───────────────────────────────────────────
 
+# ───────────────────────────────────────────
+# FOTOĞRAF İŞLEME (abonelere ve ücretsizlere limitli)
+# ───────────────────────────────────────────
+
 async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanici_olustur(user_id)
     durum = kullanici_durumu(user_id)
 
-    if not durum["abone_mi"]:
-        await update.message.reply_text(
-            "📸 Fotoğrafla soru çözme sadece abonelere özel!\n"
-            "Abone olmak için /abone yaz."
-        )
+    # 1) Genel Günlük Limit Kontrolü (Ortak havuz: 7 veya 70)
+    hak_durumu = mesaj_hakki_kontrol(user_id, durum["abone_mi"])
+    if not hak_durumu["izin_ver"]:
+        if durum["abone_mi"]:
+            await update.message.reply_text(LIMIT_MESAJI)
+        else:
+            await update.message.reply_text(
+                "⏰ Bugünlük 7 ücretsiz hakkını doldurdun!\n\n"
+                "Gece 00:00'da hakların yenilenecek. Devam etmek için /abone olabilirsin."
+            )
         return
 
-    if not gunluk_mesaj_kontrol(user_id):
-        await update.message.reply_text(LIMIT_MESAJI)
+    # 2) FOTOĞRAF LİMİTİ KONTROLÜ (Maliyet Koruması)
+    bugun = datetime.now().strftime("%Y-%m-%d")
+    foto_kullanimi = context.user_data.get(f"foto_{bugun}", 0)
+
+    # Aboneye günde 15 fotoğraf, ücretsiz kullanıcıya 3 fotoğraf hakkı
+    foto_limiti = 15 if durum["abone_mi"] else 3
+
+    if foto_kullanimi >= foto_limiti:
+        if durum["abone_mi"]:
+            await update.message.reply_text(
+                f"📸 Aboneler için günlük {foto_limiti} fotoğraf çözüm sınırına ulaştın!\n\n"
+                "Yapay zeka görsel işleme maliyetlerinden dolayı bir sınırımız var. Ancak günlük kalan hakkınla metin olarak soru sormaya devam edebilirsin! Yarın fotoğraf hakkın yenilenecek."
+            )
+        else:
+            await update.message.reply_text(
+                f"📸 Bugünlük {foto_limiti} adet ücretsiz fotoğraf hakkını doldurdun!\n\n"
+                "Yarın tekrar deneyebilir veya fotoğraf limitini artırmak için /abone olabilirsin! 🚀"
+            )
         return
+
+    # Hakkı varsa bugünkü fotoğraf sayacını 1 artırıyoruz
+    context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
@@ -590,11 +621,14 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         cevap = response.content[0].text
+
+        # Ana havuzdan (7 veya 70 limitinden) hakkı düşüyoruz
         gunluk_mesaj_artir(user_id)
 
         await update.message.reply_text(cevap, parse_mode="Markdown")
         await _menu_goster(update, sinav)
 
     except Exception as e:
-        await update.message.reply_text("⚠️ Fotoğraf işlenemedi, tekrar dener misin?")
+        await update.message.reply_text(
+            "⚠️ Fotoğraf işlenemedi, fotoğrafın net olduğundan emin olup tekrar dener misin?")
         print(f"Fotoğraf hatası: {e}")
