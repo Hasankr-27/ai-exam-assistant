@@ -232,6 +232,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 6) Intent filtre
     if not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
+        await _menu_goster(update, durum["sinav_turu"])
         return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -293,7 +294,9 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # SORU SAYISI SEÇİMİ (callback)
 # ───────────────────────────────────────────
 
+import json
 import asyncio
+
 
 async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -307,48 +310,75 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sinav = durum["sinav_turu"]
     model = "claude-sonnet-4-5" if durum["abone_mi"] else "claude-haiku-4-5"
 
-    await query.edit_message_text(f"⏳ {sayi} soru hazırlanıyor...")
+    await query.edit_message_text(f"⏳ Senin için tam {sayi} adet yepyeni soru hazırlıyorum, biraz bekle...")
 
-    onceki_sorular = []
+    # --- GEÇMİŞ SORU KONTROLÜ (AYNI SORULARI SORMAMASI İÇİN) ---
+    gecmis_sorular = context.user_data.get("gecmis_sorular", [])
+    gecmis_metin = ""
+    if gecmis_sorular:
+        # Prompt çok uzamasın diye sadece son 10 sorunun metnini Claude'a veriyoruz
+        son_sorular = gecmis_sorular[-10:]
+        gecmis_metin = f"\nÖNEMLİ: Daha önce kullanıcıya şu soruları sordun. LÜTFEN BUNLARA BENZEMEYEN, TAMAMEN FARKLI YENİ SORULAR ÜRET:\n" + "\n".join(
+            son_sorular)
 
-    for i in range(sayi):
-        onceki = "\n".join(onceki_sorular) if onceki_sorular else "Yok"
+    prompt = f"""
+{sinav} sınavı {ders} dersi {konu} konusu ile ilgili {sayi} adet çoktan seçmeli soru hazırla.{gecmis_metin}
 
-        soru_response = client.messages.create(
+Sadece ama sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yazma.
+Format tamamen şu şekilde olmalı:
+[
+  {{
+    "soru": "Soru metni buraya...\nA) ...\nB) ...\nC) ...\nD) ...\nE) ...",
+    "cevap": "A",
+    "cozum": "Doğru cevabın neden A olduğuna dair 2-3 cümlelik kısa, net çözüm açıklaması."
+  }}
+]
+"""
+
+    try:
+        response = client.messages.create(
             model=model,
-            max_tokens=800,
-            messages=[{
-                "role": "user",
-                "content": f"{sinav} sınavı {ders} dersi {konu} konusundan soru {i+1} yaz. Daha önce sorulanlar: {onceki}. Sadece şu formatı kullan, başka hiçbir şey yazma:\n\nSoru: ...\nA) ...\nB) ...\nC) ...\nD) ...\nE) ...\nCEVAP: X"
-            }]
-        ).content[0].text
+            max_tokens=2500,
+            messages=[{"role": "user", "content": prompt}]
+        )
 
-        satirlar = [s.strip() for s in soru_response.strip().split("\n") if s.strip()]
-        dogru_cevap = "A"
-        soru_satirlari = []
+        ciktı = response.content[0].text.strip()
 
-        for satir in satirlar:
-            if satir.upper().startswith("CEVAP:"):
-                dogru_cevap = satir.split(":")[-1].strip()[0].upper()
-            else:
-                soru_satirlari.append(satir)
+        if ciktı.startswith("```json"):
+            ciktı = ciktı[7:-3].strip()
+        elif ciktı.startswith("```"):
+            ciktı = ciktı[3:-3].strip()
 
-        soru_metni = "\n".join(soru_satirlari)
+        sorular = json.loads(ciktı)
 
-        context.user_data[f"soru_{i}"] = soru_metni
-        context.user_data[f"cevap_{i}"] = dogru_cevap
-        onceki_sorular.append(soru_metni)
+        for i, soru_data in enumerate(sorular):
+            context.user_data[f"soru_{i}"] = soru_data["soru"]
+            context.user_data[f"cevap_{i}"] = soru_data["cevap"]
+            context.user_data[f"cozum_{i}"] = soru_data["cozum"]
 
-    context.user_data["toplam_soru"] = sayi
-    context.user_data["beklenen_islem"] = None
-    context.user_data["secilen_ders"] = None
+            # Üretilen her yeni soruyu geçmiş listemize ekliyoruz
+            gecmis_sorular.append(soru_data["soru"])
 
-    await _soru_gonder(query.message.chat_id, context, 0)
+        # Geçmişi context'e geri kaydediyoruz
+        context.user_data["gecmis_sorular"] = gecmis_sorular
 
-    if not durum["abone_mi"]:
-        kalan_hak_azalt(user_id)
-    else:
-        gunluk_mesaj_artir(user_id)
+        context.user_data["toplam_soru"] = len(sorular)
+        context.user_data["beklenen_islem"] = None
+        context.user_data["secilen_ders"] = None
+
+        await _soru_gonder(query.message.chat_id, context, 0)
+
+        if not durum["abone_mi"]:
+            kalan_hak_azalt(user_id)
+        else:
+            gunluk_mesaj_artir(user_id)
+
+    except json.JSONDecodeError:
+        await query.edit_message_text(
+            "⚠️ Yapay zeka soruları oluştururken bir format hatası yaptı. Lütfen tekrar sayı seçerek dene.")
+    except Exception as e:
+        print(f"Hata: {e}")
+        await query.edit_message_text("⚠️ Beklenmeyen bir hata oluştu, tekrar dener misin?")
 
 
 async def _soru_gonder(chat_id, context, index):
@@ -380,58 +410,52 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # "cevap_0_A" formatını parse et
-    veri = query.data  # örn: "cevap_0_A"
-    parcalar = veri.split("_")  # ["cevap", "0", "A"]
+    # KRİTİK: Kullanıcı butona basar basmaz butonları siliyoruz ki 2 kere basamasın!
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    veri = query.data
+    parcalar = veri.split("_")
 
     index = int(parcalar[1])
     kullanici_cevabi = parcalar[2]
 
     dogru_cevap = context.user_data.get(f"cevap_{index}")
     soru = context.user_data.get(f"soru_{index}")
+    cozum = context.user_data.get(f"cozum_{index}") # Hazırladığımız çözümü çektik
     toplam = context.user_data.get("toplam_soru", 1)
 
-    # Debug için
-    print(f"DEBUG: index={index}, kullanici={kullanici_cevabi}, dogru={dogru_cevap}")
-    print(f"DEBUG: context keys={list(context.user_data.keys())}")
-
     if dogru_cevap is None:
-        await query.edit_message_text(
-            "⚠️ Bot yeniden başladı, sorular sıfırlandı.\n"
-            "Lütfen yeni soru hazırlat!"
-        )
+        await query.edit_message_text("⚠️ Bot yeniden başladı, sorular sıfırlandı.\nLütfen yeni soru hazırlat!")
         return
 
-    sinav = kullanici_durumu(query.from_user.id)["sinav_turu"]
-
+    # Eğer cevap doğruysa
     if kullanici_cevabi == dogru_cevap:
-        mesaj = f"📊 Soru {index + 1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉"
+        mesaj = f"📊 Soru {index + 1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉\n\n📝 Çözüm: {cozum}"
+    # Eğer cevap yanlışsa (API'ye bağlanmak yok, anında cevap!)
     else:
-        aciklama = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=150,
-            messages=[{
-                "role": "user",
-                "content": f"""{sinav} sorusunda kullanıcı {kullanici_cevabi} seçti, doğru cevap {dogru_cevap}.
-Soru: {soru}
-Neden yanlış, doğru neden doğru? 2-3 cümle."""
-            }]
-        ).content[0].text
-
         mesaj = (
             f"📊 Soru {index + 1}/{toplam}\n\n{soru}\n\n"
             f"❌ Yanlış! Seçtiğin: {kullanici_cevabi}\n"
             f"✅ Doğru: {dogru_cevap}\n\n"
-            f"📝 {aciklama}"
+            f"📝 Çözüm: {cozum}"
         )
 
+    # Eski soruyu çözüm ve doğru/yanlış durumuyla güncelliyoruz
     await query.edit_message_text(mesaj)
 
-    # Sıradaki soruyu gönder
+    # Bir sonraki soru varsa O ZAMAN tek bir yeni soru olarak gönderiyoruz
     if index + 1 < toplam:
         await _soru_gonder(query.message.chat_id, context, index + 1)
+    # Sorular bittiyse menüyü gösteriyoruz
     else:
         durum = kullanici_durumu(query.from_user.id)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="🎉 Test bitti! Sonuçlarını yukarıdan inceleyebilirsin."
+        )
         await _menu_goster_chat(query.message.chat_id, context, durum["sinav_turu"])
 
 
