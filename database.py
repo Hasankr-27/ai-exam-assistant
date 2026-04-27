@@ -92,27 +92,42 @@ def kalan_hak_azalt(user_id: int):
     conn.close()
 
 
-def gunluk_mesaj_kontrol(user_id: int) -> bool:
+def mesaj_hakki_kontrol(user_id: int, abone_mi: bool) -> dict:
+    """Hem abone hem ücretsiz kullanıcılar için günlük limit kontrolü yapar."""
     conn = baglanti_ac()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT gunluk_mesaj_sayisi, son_mesaj_tarihi FROM kullanicilar WHERE user_id = %s
     """, (user_id,))
     row = cursor.fetchone()
-    cursor.close()
-    conn.close()
 
     if not row:
-        return False
+        cursor.close()
+        conn.close()
+        return {"izin_ver": False, "kalan": 0}
 
     bugun = datetime.now().strftime("%Y-%m-%d")
     son_tarih = row["son_mesaj_tarihi"]
+    kullanilan_adet = row["gunluk_mesaj_sayisi"]
 
+    # --- GECE YARISI SIFIRLAMA MANTIĞI ---
+    # Eğer son mesaj tarihi bugün değilse, sayaç sıfırlanır
     if son_tarih != bugun:
         _gunluk_sayac_sifirla(user_id, bugun)
-        return True
+        kullanilan_adet = 0
 
-    return row["gunluk_mesaj_sayisi"] < 70
+    cursor.close()
+    conn.close()
+
+    # --- LİMİT BELİRLEME ---
+    # Abone ise 70, değilse 7 hak tanımlıyoruz
+    limit = 70 if abone_mi else 7
+    kalan_hak = limit - kullanilan_adet
+
+    return {
+        "izin_ver": kullanilan_adet < limit,
+        "kalan": kalan_hak
+    }
 
 
 def gunluk_mesaj_artir(user_id: int):
