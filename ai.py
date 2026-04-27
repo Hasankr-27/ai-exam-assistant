@@ -161,10 +161,3 @@ DOGRU_CEVAP: (sadece harf)"""
     return response.content[0].text
 
 
-def coklu_soru_hazirla(konu: str, ders: str, sinav_turu: str, sayi: int, abone_mi: bool = False) -> list:
-    """Birden fazla soru üretir, her biri ayrı API çağrısı."""
-    sorular = []
-    for _ in range(sayi):
-        soru = soru_hazirla(konu, ders, sinav_turu, abone_mi)
-        sorular.append(soru)
-    return sorular

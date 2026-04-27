@@ -405,7 +405,8 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if dogru_cevap is None:
         await query.edit_message_text(
-            "⚠️ Bir hata oluştu, soruyu tekrar al."
+            "⚠️ Bot yeniden başladı, sorular sıfırlandı.\n"
+            "Lütfen yeni soru hazırlat!"
         )
         return
 
@@ -458,7 +459,7 @@ async def _menu_goster(update: Update, sinav: str):
         ],
         [
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
-            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),  # ← yeni
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="islem_sorun"),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -480,6 +481,7 @@ async def _menu_goster_chat(chat_id, context, sinav: str):
         ],
         [
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="islem_sorun"),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
