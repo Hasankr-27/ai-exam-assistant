@@ -388,17 +388,31 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    parcalar = query.data.split("_")
+    # "cevap_0_A" formatını parse et
+    veri = query.data  # örn: "cevap_0_A"
+    parcalar = veri.split("_")  # ["cevap", "0", "A"]
+
     index = int(parcalar[1])
     kullanici_cevabi = parcalar[2]
 
     dogru_cevap = context.user_data.get(f"cevap_{index}")
     soru = context.user_data.get(f"soru_{index}")
     toplam = context.user_data.get("toplam_soru", 1)
+
+    # Debug için
+    print(f"DEBUG: index={index}, kullanici={kullanici_cevabi}, dogru={dogru_cevap}")
+    print(f"DEBUG: context keys={list(context.user_data.keys())}")
+
+    if dogru_cevap is None:
+        await query.edit_message_text(
+            "⚠️ Bir hata oluştu, soruyu tekrar al."
+        )
+        return
+
     sinav = kullanici_durumu(query.from_user.id)["sinav_turu"]
 
     if kullanici_cevabi == dogru_cevap:
-        mesaj = f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉"
+        mesaj = f"📊 Soru {index + 1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉"
     else:
         aciklama = client.messages.create(
             model="claude-haiku-4-5",
@@ -407,12 +421,12 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "role": "user",
                 "content": f"""{sinav} sorusunda kullanıcı {kullanici_cevabi} seçti, doğru cevap {dogru_cevap}.
 Soru: {soru}
-Her şık için 1 cümleyle neden doğru/yanlış olduğunu yaz. Çok kısa tut."""
+Neden yanlış, doğru neden doğru? 2-3 cümle."""
             }]
         ).content[0].text
 
         mesaj = (
-            f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n"
+            f"📊 Soru {index + 1}/{toplam}\n\n{soru}\n\n"
             f"❌ Yanlış! Seçtiğin: {kullanici_cevabi}\n"
             f"✅ Doğru: {dogru_cevap}\n\n"
             f"📝 {aciklama}"
@@ -420,6 +434,7 @@ Her şık için 1 cümleyle neden doğru/yanlış olduğunu yaz. Çok kısa tut.
 
     await query.edit_message_text(mesaj)
 
+    # Sıradaki soruyu gönder
     if index + 1 < toplam:
         await _soru_gonder(query.message.chat_id, context, index + 1)
     else:
