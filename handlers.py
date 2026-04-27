@@ -34,30 +34,35 @@ BEKLEME_SURESI = 3  # saniye
 # HAZIR MESAJLAR
 # ───────────────────────────────────────────
 
+# ───────────────────────────────────────────
+# HAZIR MESAJLAR
+# ───────────────────────────────────────────
+
 HAZIR_CEVAPLAR = {
     "merhaba": "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam": "👋 Selam! /start yazarak başlayabilirsin.",
     "fiyat": "💳 **Güncel Abonelik Paketleri:**\n\n• 1 Aylık Premium: 100 ⭐\n• 3 Aylık Premium: 250 ⭐ (Avantajlı Paket!)\n\nDetaylar ve satın alma için /paketler komutunu kullanabilirsin.",
     "ucret": "💳 **Abonelik Ücretleri:**\n\nSana özel 1 Aylık sadece 100 Yıldız! 🌟 Günde 3 Yıldız'dan bile ucuza geliyor. Hemen denemek için /paketler yaz.",
-    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında yardımcı olan bir sınav asistanıyım!",
+    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında yardımcı olan bir profesyonel sınav asistanıyım!",
 }
 
 ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
-    "📚 Devam etmek için abone ol:\n"
-    "• Günde 50 mesaj hakkı\n"
-    "• Aylık sadece 80 TL\n\n"
-    "Abone olmak için /abone yaz."
+    "📚 Kesintisiz eğitime devam etmek için Premium'a geç:\n"
+    "• Günde 70 mesaj hakkı 🚀\n"
+    "• Claude 3.5 Sonnet Zekası 🧠\n"
+    "• Aylık sadece 100 ⭐\n\n"
+    "Hemen abone olmak için /paketler yaz."
 )
 
 LIMIT_MESAJI = (
-    "⏰ Bugünlük 50 mesaj hakkını kullandın!\n"
-    "Yarın sıfırlanacak. Yarın görüşürüz 💪"
+    "⏰ Bugünlük 70 mesaj hakkını doldurdun kanka!\n"
+    "Yarın sıfırlanacak. O zamana kadar dinlen, yarın görüşürüz 💪"
 )
 
 ALAKASIZ_MESAJ = (
     "📚 Sadece sınav konularında yardımcı olabiliyorum.\n"
-    "Sınav ile ilgili bir şeyler sor!"
+    "Lütfen sınav, ders veya çalışma planı ile ilgili bir şeyler sor!"
 )
 
 
@@ -96,6 +101,10 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # SINAV SEÇİMİ (callback)
 # ───────────────────────────────────────────
 
+# ───────────────────────────────────────────
+# SINAV SEÇİMİ (callback)
+# ───────────────────────────────────────────
+
 async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -103,14 +112,16 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     sinav = query.data.replace("sinav_", "")
     sinav_turu_guncelle(user_id, sinav)
-    context.user_data["sinav_turu"] = sinav  # Sınavı hafızada tutuyoruz
+    context.user_data["sinav_turu"] = sinav # Sınavı hafızada tutuyoruz
 
+    # YENİ KLAVYE DÜZENİ (Soru Sor Eklendi)
     keyboard = [
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
+            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"), # <-- İŞTE BURAYA GELDİ KANKA
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
     ]
@@ -176,18 +187,21 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # YENİ: DERS SEÇİLDİ (callback)
 # ───────────────────────────────────────────
 
+# ───────────────────────────────────────────
+# YENİ: DERS SEÇİLDİ (callback)
+# ───────────────────────────────────────────
+
 async def ders_secildi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     secilen_ders = query.data.replace("ders_", "")
     context.user_data["secilen_ders"] = secilen_ders
-    context.user_data["durum"] = "KONU_BEKLENIYOR"  # Bot artık konuyu bekleyecek
+    context.user_data["durum"] = "KONU_BEKLENIYOR" # Bot artık konuyu bekleyecek
 
     await query.edit_message_text(
-        f"✅ Ders: **{secilen_ders}**\n\n"
-        "Şimdi bana hangi konudan soru istediğini yaz.\n"
-        "(Örn: Limit, Paragrafta Anlam, Kurtuluş Savaşı...)",
+        f"✅ Ders: *{secilen_ders}*\n\n"
+        "Şimdi bana hangi konudan soru istediğini yaz 🎯",
         parse_mode="Markdown"
     )
 
@@ -474,7 +488,7 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sinav = durum["sinav_turu"] or "ÖSYM"
 
         response = client.messages.create(
-            model="claude-4-5-haiku",
+            model="claude-3-5-haiku-20241022",
             max_tokens=1000,
             messages=[{
                 "role": "user",

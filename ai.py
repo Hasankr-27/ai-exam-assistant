@@ -16,23 +16,26 @@ def intent_kontrol(mesaj: str) -> bool:
     True  → ilgili, cevap verilebilir
     False → alakasız, reddedilmeli
     """
-    response = client.messages.create(
-        model="claude-4-5-haiku", # Maliyeti düşük olması için Haiku kullanıyoruz
-        max_tokens=10,
-        messages=[
-            {
-                "role": "user",
-                "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS).
+    try:
+        response = client.messages.create(
+            model="claude-3-5-haiku-20241022", # DÜZELTİLDİ
+            max_tokens=10,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS).
 Kullanıcının mesajı sınav konularıyla ilgili mi?
 Sadece "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma.
 
 Mesaj: {mesaj}"""
-            }
-        ]
-    )
-
-    cevap = response.content[0].text.strip().upper()
-    return cevap == "EVET"
+                }
+            ]
+        )
+        cevap = response.content[0].text.strip().upper()
+        return cevap == "EVET"
+    except Exception as e:
+        print(f"Intent Filtre Hatası: {e}")
+        return True # API anlık kopsa bile bot çalışmaya devam etsin
 
 
 # ───────────────────────────────────────────
@@ -71,13 +74,12 @@ Sadece sınav konularıyla ilgili sorulara cevap ver."""
 def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
     """
     Kullanıcının mesajına AI cevabı üretir.
-    sohbet_gecmisi: [{"role": "user/assistant", "content": "..."}]
     """
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["YKS"])
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
 
-    # Abonelere 4.5 Sonnet, ücretsizlere 4.5 Haiku
-    model = "claude-4-5-sonnet" if abone_mi else "claude-4-5-haiku"
+    # DÜZELTİLDİ: Abonelere 3.5 Sonnet, ücretsizlere 3.5 Haiku
+    model = "claude-3-5-sonnet-20241022" if abone_mi else "claude-3-5-haiku-20241022"
 
     response = client.messages.create(
         model=model,
@@ -97,8 +99,8 @@ def soru_hazirla(sinav_turu: str, ders: str, konu: str, adet: int, abone_mi: boo
     """
     Kullanıcının seçtiği sınav, ders, konu ve adete göre soru üretir.
     """
-    # Abonelere 4.5 Sonnet, ücretsizlere 4.5 Haiku
-    model_adi = "claude-4-5-sonnet" if abone_mi else "claude-4-5-haiku"
+    # DÜZELTİLDİ: Abonelere 3.5 Sonnet, ücretsizlere 3.5 Haiku
+    model_adi = "claude-3-5-sonnet-20241022" if abone_mi else "claude-3-5-haiku-20241022"
 
     prompt = f"""Sen profesyonel bir {sinav_turu} uzmanısın.
 Lütfen {sinav_turu} müfredatına uygun olarak, {ders} dersinin {konu} konusundan tam {adet} adet farklı çoktan seçmeli soru hazırla.
@@ -111,7 +113,7 @@ Lütfen {sinav_turu} müfredatına uygun olarak, {ders} dersinin {konu} konusund
 
     response = client.messages.create(
         model=model_adi,
-        max_tokens=2500,  # 5 soru isteyebileceği için limiti yüksek tuttuk
+        max_tokens=2500,
         messages=[
             {
                 "role": "user",
