@@ -183,11 +183,9 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         f"✅ *{ders}* seçildi!\n\n"
-        "📝 Hangi konudan soru hazırlayayım?\n"
-        "Örnek: *türev*, *osmanlı tarihi*, *paragraf*",
+        "📝 Hangi konudan soru hazırlayayım?",
         parse_mode="Markdown",
     )
-
 
 # ───────────────────────────────────────────
 # MESAJ HANDLER (ana akış)
