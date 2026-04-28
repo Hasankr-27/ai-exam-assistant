@@ -36,8 +36,8 @@ BEKLEME_SURESI = 3
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 250 ⭐!",
-    "ucret":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 250 ⭐!",
+    "fiyat":      "💳 Aylık abonelik 100 ⭐ — 3 aylık 250 ⭐!",
+    "ucret":      "💳 Aylık abonelik 100 ⭐ — 3 aylık 250 ⭐!",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES ve diğer ÖSYM sınavlarında uzman bir asistanım!",
 }
 
@@ -86,9 +86,15 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"👋 Merhaba {isim}!\n\n"
-        "Ben senin sınav asistanınım 🎯\n"
-        "Hangi sınava hazırlanıyorsun?",
+        "🎯 *Sınav Asistanına Hoş Geldin!*\n\n"
+        "📚 Yapay zeka destekli asistanın ile:\n"
+        "✅ Konu anlatımı al\n"
+        "✅ Soru hazırlat ve çöz\n"
+        "✅ Çalışma planı oluştur\n"
+        "✅ Takıldığın soruyu çözdür\n\n"
+        "👇 Hangi sınava hazırlanıyorsun?",
         reply_markup=reply_markup,
+        parse_mode="Markdown"
     )
 
 
@@ -160,7 +166,7 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "konu": "📖 Hangi konuyu anlatmamı istersin?\nÖrnek: *türev*, *Atatürk ilkeleri*, *integral*",
         "sor":  "💬 Aklındaki soruyu yaz, cevaplayayım!\nÖrnek: *türev ne işe yarar*, *KPSS'de en çok hangi konular çıkıyor*",
         "plan": "📅 Sınava kaç günün var ve günde kaç saat çalışabilirsin?\nÖrnek: *60 gün, 4 saat*",
-        "sorun": "🚨 Sorununu yaz, en kısa sürede inceleyeceğim!",
+        "sorun": "🚨 Sorununu şu adrese ilet:\nt.me/@Hsn_0134\n\nDirekt mesaj atabilirsin, en kısa sürede döneceğim!",
     }
 
     context.user_data["beklenen_islem"] = islem
