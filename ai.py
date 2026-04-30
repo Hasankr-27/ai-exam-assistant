@@ -161,3 +161,36 @@ DOGRU_CEVAP: (sadece harf)"""
     return response.content[0].text
 
 
+def konu_dogrula(konu: str, ders: str, sinav_turu: str) -> bool:
+    response = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=10,
+        messages=[{
+            "role": "user",
+            "content": f"""{sinav_turu} sınavının {ders} dersinde "{konu}" konusu var mı?
+Sadece "EVET" veya "HAYIR" yaz."""
+        }]
+    )
+    return response.content[0].text.strip().upper() == "EVET"
+
+
+def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
+    model = "claude-sonnet-4-5" if abone_mi else "claude-haiku-4-5"
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=1500,
+        messages=[{
+            "role": "user",
+            "content": f"""{sinav_turu} sınavına {gun} gün kaldı. Günde {saat} saat çalışabiliyorum.
+
+Bana haftalık detaylı çalışma programı hazırla:
+- Her gün hangi ders kaç saat
+- Hangi konular önce çalışılmalı
+- Tekrar günleri
+- Deneme sınavı günleri
+
+Kısa ve uygulanabilir olsun, madde madde yaz."""
+        }]
+    )
+    return response.content[0].text
