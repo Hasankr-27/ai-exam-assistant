@@ -47,11 +47,12 @@ SINAV_DERSLERI = {
         "Sayısal Matematik": "matematik, sayısal",
         "Sözel Türkçe": "türkçe, sözel, anlam",
     },
-    "DIGER": {
-        "Türkçe": "türkçe",
-        "Matematik": "matematik",
-        "Yabancı Dil": "yabancı dil, ingilizce",
-        "Alan Dersi": "alan dersi",
+    "YDS": {
+    "Dilbilgisi": "grammar, tenses, prepositions, conjunctions",
+    "Kelime Bilgisi": "vocabulary, synonyms, antonyms",
+    "Okuma Anlama": "reading comprehension, paragraphs",
+    "Çeviri": "translation, Turkish to English",
+    "Cloze Test": "cloze test, fill in the blanks",
     }
 }
 
@@ -80,10 +81,11 @@ Sayısal ve Sözel bölümlerde yardımcı olursun.
 Sadece ALES konularıyla ilgili sorulara cevap ver.
 Kısa, öz ve anlaşılır anlat.""",
 
-    "DIGER": """Sen tüm ÖSYM sınavları konusunda uzman bir öğretmensin.
-YDT, LGS, MSÜ ve diğer sınavlarda yardımcı olursun.
-Sadece sınav konularıyla ilgili sorulara cevap ver.
-Kısa, öz ve anlaşılır anlat.""",
+    "YDS": """Sen YDS (Yabancı Dil Sınavı) konusunda uzman bir öğretmensin.
+İngilizce dilbilgisi, kelime bilgisi, okuma anlama ve çeviri konularında yardımcı olursun.
+Sadece YDS konularıyla ilgili sorulara cevap ver.
+Türkçe açıklama yap ama İngilizce örnekler kullan.
+Kısa, öz ve anlaşılır anlat."""
 }
 
 # ───────────────────────────────────────────
