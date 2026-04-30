@@ -15,7 +15,7 @@ from database import (
     gunluk_mesaj_artir,
     mesaj_hakki_kontrol,
 )
-from ai import intent_kontrol, ai_cevap_al, soru_hazirla, SINAV_DERSLERI
+from ai import intent_kontrol, ai_cevap_al, soru_hazirla, SINAV_DERSLERI, konu_dogrula, calisma_plani_olustur
 import os
 from dotenv import load_dotenv
 
@@ -45,7 +45,7 @@ ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
     "• Günde 70 mesaj hakkı\n"
-    "• 1 Aylık → 80 ⭐\n"
+    "• 1 Aylık → 100 ⭐\n"
     "• 3 Aylık → 250 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
@@ -241,10 +241,12 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-    # 6) Intent filtre
-    if not intent_kontrol(metin):
+    beklenen = context.user_data.get("beklenen_islem", "genel")
+    sinav = durum["sinav_turu"]
+
+    # 6) Intent filtre - ama plan için atlama
+    if beklenen != "plan" and not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
-        await _menu_goster(update, durum["sinav_turu"])
         return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -255,8 +257,15 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # ── SORU KONUSU GELDİ → kaç soru sor ──
         if beklenen == "soru" and context.user_data.get("secilen_ders"):
+            ders = context.user_data.get("secilen_ders")  # ← bunu ekle
+            if not konu_dogrula(metin, ders, sinav):
+                await update.message.reply_text(
+                    f"⚠️ *{metin}* konusu {sinav} {ders} müfredatında yok!\n\n"
+                    "Lütfen geçerli bir konu yaz.",
+                    parse_mode="Markdown"
+                )
+                return
             context.user_data["soru_konusu"] = metin
-            context.user_data["beklenen_islem"] = "soru_sayi"
 
             keyboard = [[
                 InlineKeyboardButton("1", callback_data="sayi_1"),
@@ -275,6 +284,20 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # ── NORMAL SOHBET ──
+        if beklenen == "plan":
+            try:
+                parcalar = metin.replace(" ", "").split(",")
+                gun = int(''.join(filter(str.isdigit, parcalar[0])))
+                saat = int(''.join(filter(str.isdigit, parcalar[1])))
+                cevap = calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
+                context.user_data["beklenen_islem"] = None
+            except:
+                await update.message.reply_text(
+                    "⚠️ Şu formatta yaz:\n*47 gün, 7 saat*",
+                    parse_mode="Markdown"
+                )
+                return
+
         else:
             gecmis = context.user_data.get("sohbet_gecmisi", [])
             cevap = ai_cevap_al(metin, sinav, gecmis, durum["abone_mi"])
@@ -484,8 +507,9 @@ async def _menu_goster(update: Update, sinav: str):
         ],
         [
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
-            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="islem_sorun"),
-        ],
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
+
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -638,3 +662,13 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "⚠️ Fotoğraf işlenemedi, fotoğrafın net olduğundan emin olup tekrar dener misin?")
         print(f"Fotoğraf hatası: {e}")
+
+async def sorun_bildir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "🚨 Sorununu şu adrese ilet:\n"
+        "t.me/Hsn_0134\n\n"
+        "Direkt mesaj atabilirsin, en kısa sürede döneceğim!"
+    )
+
