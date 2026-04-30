@@ -79,7 +79,7 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
         ],
         [
-            InlineKeyboardButton("📓 Diğer", callback_data="sinav_DIGER"),
+            InlineKeyboardButton("📓 YDS", callback_data="sinav_YDS"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -116,7 +116,7 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
-            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),
+            InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
     ]
@@ -502,7 +502,7 @@ async def _menu_goster(update: Update, sinav: str):
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
-            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),
+            InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
         [
@@ -525,12 +525,12 @@ async def _menu_goster_chat(chat_id, context, sinav: str):
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
         ],
         [
-            InlineKeyboardButton("💬 Soru Sor", callback_data="islem_sor"),
+            InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
         [
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
-            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="islem_sorun"),
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -559,7 +559,7 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
         ],
         [
-            InlineKeyboardButton("📓 Diğer", callback_data="sinav_DIGER"),
+            InlineKeyboardButton("📓 YDS", callback_data="sinav_YDS"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
