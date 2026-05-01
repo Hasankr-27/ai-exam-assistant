@@ -36,17 +36,17 @@ BEKLEME_SURESI = 3
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 100 ⭐ — 3 aylık 250 ⭐!",
-    "ucret":      "💳 Aylık abonelik 100 ⭐ — 3 aylık 250 ⭐!",
-    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES, YDS sınavlarında uzman bir asistanım!",
+    "fiyat":      "💳 Aylık abonelik 50 ⭐ — 3 aylık 150 ⭐!",
+    "ucret":      "💳 Aylık abonelik 50 ⭐ — 3 aylık 150 ⭐!",
+    "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES, YDT sınavlarında uzman bir asistanım!",
 }
 
 ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
     "• Günde 70 mesaj hakkı\n"
-    "• 1 Aylık → 100 ⭐\n"
-    "• 3 Aylık → 250 ⭐\n\n"
+    "• 1 Aylık → 50 ⭐\n"
+    "• 3 Aylık → 150 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
 
@@ -79,7 +79,7 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
         ],
         [
-            InlineKeyboardButton("📓 YDS", callback_data="sinav_YDS"),
+            InlineKeyboardButton("📓 YDT", callback_data="sinav_YDT"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -108,6 +108,30 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
     sinav = query.data.replace("sinav_", "")
+
+    # YDT seçilince dil seçimi çıksın
+    if sinav == "YDT":
+        keyboard = [
+            [
+                InlineKeyboardButton("🇬🇧 İngilizce", callback_data="sinav_YDT_Ingilizce"),
+                InlineKeyboardButton("🇸🇦 Arapça", callback_data="sinav_YDT_Arapca"),
+            ],
+            [
+                InlineKeyboardButton("🇩🇪 Almanca", callback_data="sinav_YDT_Almanca"),
+                InlineKeyboardButton("🇫🇷 Fransızca", callback_data="sinav_YDT_Fransizca"),
+            ],
+            [
+                InlineKeyboardButton("🇷🇺 Rusça", callback_data="sinav_YDT_Rusca"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "📓 YDT — Hangi dili seçiyorsun?",
+            reply_markup=reply_markup,
+        )
+        return
+
+    # Diğer sınavlar normal devam eder
     sinav_turu_guncelle(user_id, sinav)
 
     keyboard = [
@@ -123,8 +147,7 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        f"✅ {sinav} seçildi!\n\n"
-        "Ne yapmak istersin?",
+        f"✅ {sinav} seçildi!\n\nNe yapmak istersin?",
         reply_markup=reply_markup,
     )
 
@@ -245,7 +268,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sinav = durum["sinav_turu"]
 
     # 6) Intent filtre - plan, soru konusu ve soru çözdür için atla
-    if beklenen not in ("plan", "soru", "sor") and not intent_kontrol(metin):
+    if beklenen not in ("plan", "soru", "sor", "konu") and not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
         return
 
@@ -536,7 +559,7 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
         ],
         [
-            InlineKeyboardButton("📓 YDS", callback_data="sinav_YDS"),
+            InlineKeyboardButton("📓 YDT", callback_data="sinav_YDT"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)

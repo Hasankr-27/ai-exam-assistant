@@ -38,23 +38,51 @@ SINAV_DERSLERI = {
         "Eğitim Bilimleri": "gelişim psikolojisi, öğrenme, program geliştirme, ölçme değerlendirme",
     },
     "DGS": {
-        "Matematik": "matematik, sayısal",
-        "Geometri": "geometri",
-        "Türkçe": "türkçe, sözel",
-        "Anlam Bilgisi": "anlam bilgisi, kelime",
+    "Sayısal - Matematik": "matematik, sayılar, cebir, problemler",
+    "Sayısal - Geometri": "geometri, alan, hacim, açılar",
+    "Sözel - Türkçe": "türkçe, dil bilgisi, paragraf",
+    "Sözel - Anlam Bilgisi": "anlam bilgisi, kelime, deyim",
+    "Sözel - Mantık": "mantık, akıl yürütme",
     },
     "ALES": {
         "Sayısal Matematik": "matematik, sayısal",
         "Sözel Türkçe": "türkçe, sözel, anlam",
     },
-    "YDS": {
-    "Dilbilgisi": "grammar, tenses, prepositions, conjunctions",
-    "Kelime Bilgisi": "vocabulary, synonyms, antonyms",
-    "Okuma Anlama": "reading comprehension, paragraphs",
-    "Çeviri": "translation, Turkish to English",
-    "Cloze Test": "cloze test, fill in the blanks",
-    }
+    "YDT_Ingilizce": {
+        "Dilbilgisi": "grammar, tenses, prepositions, conjunctions",
+        "Kelime Bilgisi": "vocabulary, synonyms, antonyms, word forms",
+        "Okuma Anlama": "reading comprehension, main idea, inference",
+        "Cloze Test": "fill in the blanks, context clues",
+    },
+    "YDT_Arapca": {
+        "Dilbilgisi": "arapça gramer, sarf, nahiv",
+        "Kelime Bilgisi": "arapça kelimeler, eş anlamlı, zıt anlamlı",
+        "Okuma Anlama": "arapça metin anlama",
+        "Çeviri": "türkçe-arapça çeviri",
+    },
+    "YDT_Almanca": {
+        "Dilbilgisi": "deutsche grammatik, zeitformen, kasus",
+        "Kelime Bilgisi": "vokabular, synonyme, antonyme",
+        "Okuma Anlama": "leseverstehen, textverständnis",
+        "Cloze Test": "lückentext, ergänzungsaufgaben",
+    },
+    "YDT_Fransizca": {
+        "Dilbilgisi": "grammaire française, conjugaison, temps",
+        "Kelime Bilgisi": "vocabulaire, synonymes, antonymes",
+        "Okuma Anlama": "compréhension écrite, lecture",
+        "Cloze Test": "texte à trous, complétion",
+    },
+    "YDT_Rusca": {
+        "Dilbilgisi": "русская грамматика, падежи, глаголы",
+        "Kelime Bilgisi": "словарный запас, синонимы",
+        "Okuma Anlama": "чтение и понимание текста",
+        "Çeviri": "türkçe-rusça çeviri",
+    },
 }
+
+
+
+
 
 # ───────────────────────────────────────────
 # SİSTEM PROMPTLARI
@@ -81,12 +109,33 @@ Sayısal ve Sözel bölümlerde yardımcı olursun.
 Sadece ALES konularıyla ilgili sorulara cevap ver.
 Kısa, öz ve anlaşılır anlat.""",
 
-    "YDS": """Sen YDS (Yabancı Dil Sınavı) konusunda uzman bir öğretmensin.
-İngilizce dilbilgisi, kelime bilgisi, okuma anlama ve çeviri konularında yardımcı olursun.
-Sadece YDS konularıyla ilgili sorulara cevap ver.
-Türkçe açıklama yap ama İngilizce örnekler kullan.
-Kısa, öz ve anlaşılır anlat."""
+    "YDT_Ingilizce": """Sen YDT İngilizce uzmanı bir öğretmensin.
+YKS sınavındaki YDT İngilizce bölümünde yardımcı olursun.
+Dilbilgisi, kelime bilgisi, okuma anlama ve cloze test konularında uzman.
+Türkçe açıklama yap, İngilizce örnekler kullan.
+Kısa, öz ve anlaşılır anlat.""",
+
+    "YDT_Arapca": """Sen YDT Arapça uzmanı bir öğretmensin.
+YKS sınavındaki YDT Arapça bölümünde yardımcı olursun.
+Türkçe açıklama yap, Arapça örnekler kullan.
+Kısa, öz ve anlaşılır anlat.""",
+
+    "YDT_Almanca": """Sen YDT Almanca uzmanı bir öğretmensin.
+YKS sınavındaki YDT Almanca bölümünde yardımcı olursun.
+Türkçe açıklama yap, Almanca örnekler kullan.
+Kısa, öz ve anlaşılır anlat.""",
+
+    "YDT_Fransizca": """Sen YDT Fransızca uzmanı bir öğretmensin.
+YKS sınavındaki YDT Fransızca bölümünde yardımcı olursun.
+Türkçe açıklama yap, Fransızca örnekler kullan.
+Kısa, öz ve anlaşılır anlat.""",
+
+    "YDT_Rusca": """Sen YDT Rusça uzmanı bir öğretmensin.
+YKS sınavındaki YDT Rusça bölümünde yardımcı olursun.
+Türkçe açıklama yap, Rusça örnekler kullan.
+Kısa, öz ve anlaşılır anlat.""",
 }
+
 
 # ───────────────────────────────────────────
 # INTENT FILTER
@@ -99,8 +148,9 @@ def intent_kontrol(mesaj: str) -> bool:
         messages=[
             {
                 "role": "user",
-                "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS/ALES/ÖSYM).
-Kullanıcının mesajı sınav konularıyla ilgili mi?
+                "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS/ALES/YDT/ÖSYM).
+Kullanıcının mesajı sınav konularıyla, derslerle veya öğrenmek istediği bir şeyle ilgili mi?
+Eğitim, ders, konu, soru içeriyorsa EVET de.
 Sadece "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma.
 
 Mesaj: {mesaj}"""
