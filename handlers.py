@@ -657,3 +657,10 @@ async def sorun_bildir_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         "t.me/Hsn_0134\n\n"
         "Direkt mesaj atabilirsin, en kısa sürede döneceğim!"
     )
+
+async def sorun_bildir_komut(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🚨 Sorununu şu adrese ilet:\n"
+        "t.me/Hsn_0134\n\n"
+        "Direkt mesaj atabilirsin, en kısa sürede döneceğim!"
+    )
