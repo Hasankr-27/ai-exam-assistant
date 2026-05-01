@@ -219,7 +219,8 @@ def konu_dogrula(konu: str, ders: str, sinav_turu: str) -> bool:
         max_tokens=10,
         messages=[{
             "role": "user",
-            "content": f"""{sinav_turu} sınavının {ders} dersinde "{konu}" konusu var mı?
+            "content": f"""{sinav_turu} sınavının {ders} dersinde "{konu}" konusu veya buna benzer bir konu var mı?
+Geniş yorumla, İngilizce kelimeler de olabilir.
 Sadece "EVET" veya "HAYIR" yaz."""
         }]
     )

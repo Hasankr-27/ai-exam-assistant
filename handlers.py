@@ -268,7 +268,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sinav = durum["sinav_turu"]
 
     # 6) Intent filtre - plan, soru konusu ve soru çözdür için atla
-    if beklenen not in ("plan", "soru", "sor", "konu") and not intent_kontrol(metin):
+    if beklenen == "genel" and not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
         return
 
