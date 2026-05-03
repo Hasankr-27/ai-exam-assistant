@@ -36,8 +36,8 @@ BEKLEME_SURESI = 3
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 50 ⭐ — 3 aylık 150 ⭐!",
-    "ucret":      "💳 Aylık abonelik 50 ⭐ — 3 aylık 150 ⭐!",
+    "fiyat":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 200 ⭐!",
+    "ucret":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 200 ⭐!",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES, YDT sınavlarında uzman bir asistanım!",
 }
 
@@ -45,8 +45,8 @@ ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
     "• Günde 70 mesaj hakkı\n"
-    "• 1 Aylık → 50 ⭐\n"
-    "• 3 Aylık → 150 ⭐\n\n"
+    "• 1 Aylık → 80 ⭐\n"
+    "• 3 Aylık → 200 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
 
@@ -60,6 +60,11 @@ ALAKASIZ_MESAJ = (
     "Sınav ile ilgili bir şeyler sor!"
 )
 
+MENU_SEC_MESAJI = (
+    "👆 Lütfen önce menüden bir seçenek seç!\n"
+    "Konu Anlat, Soru Hazırla, Soru Çözdür veya Çalışma Planı."
+)
+
 
 # ───────────────────────────────────────────
 # /start KOMUTU
@@ -68,6 +73,7 @@ ALAKASIZ_MESAJ = (
 async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     isim = update.effective_user.first_name
     kullanici_olustur(update.effective_user.id)
+    context.user_data["beklenen_islem"] = None
 
     keyboard = [
         [
@@ -109,7 +115,7 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     sinav = query.data.replace("sinav_", "")
 
-    # YDT seçilince dil seçimi çıksın
+    # YDT → dil seçimi
     if sinav == "YDT":
         keyboard = [
             [
@@ -122,6 +128,9 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
             [
                 InlineKeyboardButton("🇷🇺 Rusça", callback_data="sinav_YDT_Rusca"),
+            ],
+            [
+                InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -131,9 +140,16 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Diğer sınavlar normal devam eder
     sinav_turu_guncelle(user_id, sinav)
+    context.user_data["beklenen_islem"] = None
+    await _menu_goster_query(query, sinav)
 
+
+# ───────────────────────────────────────────
+# MENÜ GÖSTER (query ile)
+# ───────────────────────────────────────────
+
+async def _menu_goster_query(query, sinav: str):
     keyboard = [
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
@@ -143,9 +159,15 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
             InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
         ],
+        [
+            InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await query.edit_message_text(
         f"✅ {sinav} seçildi!\n\nNe yapmak istersin?",
         reply_markup=reply_markup,
@@ -177,6 +199,7 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 satir.append(InlineKeyboardButton(ders_listesi[i+1], callback_data=f"ders_{ders_listesi[i+1]}"))
             keyboard.append(satir)
 
+        keyboard.append([InlineKeyboardButton("🔙 Geri", callback_data="geri_menu")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             f"📚 {sinav} — Hangi dersten soru hazırlayayım?",
@@ -186,17 +209,59 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mesajlar = {
         "konu": "📖 Hangi konuyu anlatmamı istersin?\nÖrnek: *türev*, *Atatürk ilkeleri*, *paragraf*",
-        "sor":  "💬 Sorunuzu yazın, çözeyim!\nÖrnek: *2x + 3 = 7 denklemini çöz*, *Bu paragrafı analiz et*",
+        "sor":  "💬 Sorunuzu yazın, çözeyim!\nÖrnek: *2x + 3 = 7 denklemini çöz*\nFotoğraf da atabilirsin 📸",
         "plan": "📅 Sınava kaç günün var ve günde kaç saat çalışabilirsin?\nÖrnek: *60 gün, 4 saat*",
         "sorun": "🚨 Sorununu şu adrese ilet:\nt.me/Hsn_0134\n\nDirekt mesaj atabilirsin!",
     }
 
     context.user_data["beklenen_islem"] = islem
 
+    keyboard = [[InlineKeyboardButton("🔙 Geri", callback_data="geri_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     await query.edit_message_text(
         mesajlar.get(islem, "Ne yapmak istersin?"),
+        reply_markup=reply_markup,
         parse_mode="Markdown",
     )
+
+
+# ───────────────────────────────────────────
+# GERİ TUŞLARI (callback)
+# ───────────────────────────────────────────
+
+async def geri_baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data["beklenen_islem"] = None
+
+    keyboard = [
+        [
+            InlineKeyboardButton("📘 YKS", callback_data="sinav_YKS"),
+            InlineKeyboardButton("📗 KPSS", callback_data="sinav_KPSS"),
+        ],
+        [
+            InlineKeyboardButton("📙 DGS", callback_data="sinav_DGS"),
+            InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
+        ],
+        [
+            InlineKeyboardButton("📓 YDT", callback_data="sinav_YDT"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "👇 Hangi sınava hazırlanıyorsun?",
+        reply_markup=reply_markup,
+    )
+
+
+async def geri_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data["beklenen_islem"] = None
+    durum = kullanici_durumu(query.from_user.id)
+    sinav = durum["sinav_turu"] or "YKS"
+    await _menu_goster_query(query, sinav)
 
 
 # ───────────────────────────────────────────
@@ -211,9 +276,13 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["secilen_ders"] = ders
     context.user_data["beklenen_islem"] = "soru"
 
+    keyboard = [[InlineKeyboardButton("🔙 Geri", callback_data="geri_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     await query.edit_message_text(
         f"✅ *{ders}* seçildi!\n\n"
         "📝 Hangi konudan soru hazırlayayım?",
+        reply_markup=reply_markup,
         parse_mode="Markdown",
     )
 
@@ -263,11 +332,30 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(LIMIT_MESAJI)
         return
 
-    # 5) beklenen ve sinav değişkenlerini burada tanımla
-    beklenen = context.user_data.get("beklenen_islem", "genel")
+    # 5) beklenen ve sinav
+    beklenen = context.user_data.get("beklenen_islem", None)
     sinav = durum["sinav_turu"]
 
-    # 6) Intent filtre - plan, soru konusu ve soru çözdür için atla
+    # 6) Menüden seçim yapılmamışsa engelle
+    if not beklenen:
+        keyboard = [
+            [
+                InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+                InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+            ],
+            [
+                InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+                InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+            ],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            MENU_SEC_MESAJI,
+            reply_markup=reply_markup,
+        )
+        return
+
+    # 7) Intent filtre - sadece genel sohbette
     if beklenen == "genel" and not intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
         return
@@ -275,7 +363,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
-        # ── SORU KONUSU GELDİ → konu doğrula → kaç soru sor ──
+        # ── SORU KONUSU GELDİ ──
         if beklenen == "soru" and context.user_data.get("secilen_ders"):
             ders = context.user_data.get("secilen_ders")
             if not konu_dogrula(metin, ders, sinav):
@@ -311,7 +399,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 gun = int(''.join(filter(str.isdigit, parcalar[0])))
                 saat = int(''.join(filter(str.isdigit, parcalar[1])))
                 cevap = calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
-                context.user_data["beklenen_islem"] = None
+                context.user_data["beklened_islem"] = None
             except:
                 await update.message.reply_text(
                     "⚠️ Şu formatta yaz:\n*47 gün, 7 saat*",
@@ -319,10 +407,11 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-        # ── SORU ÇÖZDÜR veya KONU ANLAT veya GENEL SOHBET ──
+        # ── KONU ANLAT / SORU ÇÖZDÜR / GENEL ──
         else:
             gecmis = context.user_data.get("sohbet_gecmisi", [])
-            cevap = ai_cevap_al(metin, sinav, gecmis, durum["abone_mi"])
+            # Herkes için Sonnet kullan (doğruluk için)
+            cevap = ai_cevap_al(metin, sinav, gecmis, True)
 
             gecmis.append({"role": "user", "content": metin})
             gecmis.append({"role": "assistant", "content": cevap})
@@ -360,7 +449,6 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     durum = kullanici_durumu(user_id)
     sinav = durum["sinav_turu"]
-    model = "claude-sonnet-4-5" if durum["abone_mi"] else "claude-haiku-4-5"
 
     await query.edit_message_text(f"⏳ {sayi} soru hazırlanıyor...")
 
@@ -388,7 +476,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 
     try:
         response = client.messages.create(
-            model=model,
+            model="claude-sonnet-4-5",
             max_tokens=2500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -410,7 +498,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 
         context.user_data["gecmis_sorular"] = gecmis_sorular
         context.user_data["toplam_soru"] = len(sorular)
-        context.user_data["beklenen_islem"] = None
+        context.user_data["beklened_islem"] = None
         context.user_data["secilen_ders"] = None
 
         await _soru_gonder(query.message.chat_id, context, 0)
@@ -510,6 +598,9 @@ async def _menu_goster(update: Update, sinav: str):
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
             InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
         ],
+        [
+            InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -532,6 +623,9 @@ async def _menu_goster_chat(chat_id, context, sinav: str):
             InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
             InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
         ],
+        [
+            InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
@@ -548,26 +642,7 @@ async def _menu_goster_chat(chat_id, context, sinav: str):
 async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
-    keyboard = [
-        [
-            InlineKeyboardButton("📘 YKS", callback_data="sinav_YKS"),
-            InlineKeyboardButton("📗 KPSS", callback_data="sinav_KPSS"),
-        ],
-        [
-            InlineKeyboardButton("📙 DGS", callback_data="sinav_DGS"),
-            InlineKeyboardButton("📒 ALES", callback_data="sinav_ALES"),
-        ],
-        [
-            InlineKeyboardButton("📓 YDT", callback_data="sinav_YDT"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text(
-        "Hangi sınava geçmek istersin?",
-        reply_markup=reply_markup,
-    )
+    await geri_baslat(update, context)
 
 
 # ───────────────────────────────────────────
@@ -578,6 +653,15 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanici_olustur(user_id)
     durum = kullanici_durumu(user_id)
+
+    # Sadece soru çözdür modunda fotoğraf kabul et
+    beklenen = context.user_data.get("beklened_islem")
+    if beklenen != "sor":
+        await update.message.reply_text(
+            "📸 Fotoğraf göndermek için önce *Soru Çözdür* seçeneğine bas!",
+            parse_mode="Markdown"
+        )
+        return
 
     hak_durumu = mesaj_hakki_kontrol(user_id, durum["abone_mi"])
     if not hak_durumu["izin_ver"]:
@@ -646,7 +730,7 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────────────────────────
-# SORUN BİLDİR (callback)
+# SORUN BİLDİR
 # ───────────────────────────────────────────
 
 async def sorun_bildir_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -657,6 +741,7 @@ async def sorun_bildir_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         "t.me/Hsn_0134\n\n"
         "Direkt mesaj atabilirsin, en kısa sürede döneceğim!"
     )
+
 
 async def sorun_bildir_komut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(

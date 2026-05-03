@@ -24,6 +24,8 @@ from handlers import (
     fotograf_isle,
     sorun_bildir_handler,
     sorun_bildir_komut,
+    geri_baslat,
+    geri_menu,
 )
 from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi, odeme_sec
 
@@ -39,7 +41,7 @@ def main():
     app.add_handler(CommandHandler("baslat", baslat))
     app.add_handler(CommandHandler("start",  baslat))
     app.add_handler(CommandHandler("abone",  abone_ol))
-    app.add_handler(CommandHandler("sorun", sorun_bildir_komut))
+    app.add_handler(CommandHandler("sorun",  sorun_bildir_komut))
 
     # ── Buton tıklamaları ─────────────────────
     app.add_handler(CallbackQueryHandler(sinav_sec,       pattern="^sinav_(YKS|KPSS|DGS|ALES|YDT|YDT_Ingilizce|YDT_Arapca|YDT_Almanca|YDT_Fransizca|YDT_Rusca)$"))
@@ -50,6 +52,8 @@ def main():
     app.add_handler(CallbackQueryHandler(cevap_kontrol,   pattern="^cevap_\\d+_(A|B|C|D|E)$"))
     app.add_handler(CallbackQueryHandler(odeme_sec,       pattern="^odeme_(1ay|3ay)$"))
     app.add_handler(CallbackQueryHandler(sorun_bildir_handler, pattern="^sorun_bildir$"))
+    app.add_handler(CallbackQueryHandler(geri_baslat,     pattern="^geri_baslat$"))
+    app.add_handler(CallbackQueryHandler(geri_menu,       pattern="^geri_menu$"))
 
     # ── Ödeme ─────────────────────────────────
     app.add_handler(PreCheckoutQueryHandler(on_odeme_kontrol))

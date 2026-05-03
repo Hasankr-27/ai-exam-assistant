@@ -168,7 +168,7 @@ Mesaj: {mesaj}"""
 def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["DIGER"])
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
-    model = "claude-sonnet-4-5" if abone_mi else "claude-haiku-4-5"
+    model = "claude-sonnet-4-5"  # herkes için Sonnet
 
     response = client.messages.create(
         model=model,
