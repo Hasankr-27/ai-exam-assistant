@@ -15,7 +15,7 @@ from database import (
     gunluk_mesaj_artir,
     mesaj_hakki_kontrol,
 )
-from ai import intent_kontrol, ai_cevap_al, SINAV_DERSLERI, konu_dogrula, calisma_plani_olustur
+from ai import intent_kontrol, ai_cevap_al, SINAV_DERSLERI, calisma_plani_olustur
 import os
 from dotenv import load_dotenv
 
@@ -365,15 +365,6 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # ── SORU KONUSU GELDİ ──
         if beklenen == "soru" and context.user_data.get("secilen_ders"):
-            ders = context.user_data.get("secilen_ders")
-            if not konu_dogrula(metin, ders, sinav):
-                await update.message.reply_text(
-                    f"⚠️ *{metin}* konusu {sinav} {ders} müfredatında yok!\n\n"
-                    "Lütfen geçerli bir konu yaz.",
-                    parse_mode="Markdown"
-                )
-                return
-
             context.user_data["soru_konusu"] = metin
 
             keyboard = [[
