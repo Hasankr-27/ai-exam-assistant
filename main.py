@@ -1,4 +1,5 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 
 from telegram import Update
@@ -32,8 +33,29 @@ from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi, odeme_sec
 load_dotenv()
 
 
+async def _api_test():
+    """Bot başlarken Anthropic API bağlantısını test eder."""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("❌ ANTHROPIC_API_KEY ayarlanmamış! AI özellikleri çalışmaz.")
+        return
+    try:
+        from anthropic import AsyncAnthropic
+        test_client = AsyncAnthropic(api_key=api_key)
+        await test_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=5,
+            messages=[{"role": "user", "content": "test"}]
+        )
+        print("✅ Anthropic API bağlantısı başarılı.")
+    except Exception as e:
+        print(f"❌ Anthropic API HATASI: {type(e).__name__}: {e}")
+        print("❌ ANTHROPIC_API_KEY geçerli mi? AI özellikleri çalışmayacak!")
+
+
 def main():
     tablolari_olustur()
+    asyncio.run(_api_test())
 
     app = ApplicationBuilder().token(os.getenv("TELEGRAM_TOKEN")).build()
 
