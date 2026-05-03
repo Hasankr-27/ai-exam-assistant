@@ -288,7 +288,7 @@ Geniş yorumla, kısaltmalar ve farklı yazımlar da kabul et.
 Sadece "EVET" veya "HAYIR" yaz."""
         }]
     )
-    return response.content[0].text.strip().upper() == "EVET"
+    return "EVET" in response.content[0].text.strip().upper()
 
 
 def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
