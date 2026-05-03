@@ -408,21 +408,18 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             gecmis.append({"role": "assistant", "content": cevap})
             context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
-        # Hak güncelle
-        gunluk_mesaj_artir(user_id)
-
-        if not durum["abone_mi"]:
-            kalan = hak_durumu["kalan"] - 1
-            if kalan == 1:
-                cevap += "\n\n⚠️ *Bugünlük son ücretsiz hakkın!* Devam için /abone yaz."
-            elif kalan == 0:
-                cevap += "\n\n⛔ *Bugünlük ücretsiz hakkın bitti.* Yarın yenilenecek veya /abone yazabilirsin."
-
+        # Önce cevabı gönder
         try:
             await update.message.reply_text(cevap, parse_mode="Markdown")
         except Exception:
             await update.message.reply_text(cevap)
         await _menu_goster(update, sinav)
+
+        # Sonra hak güncelle (hata verse bile cevap zaten gönderildi)
+        try:
+            gunluk_mesaj_artir(user_id)
+        except Exception as e:
+            print(f"DB güncelleme hatası: {type(e).__name__}: {e}")
 
     except Exception as e:
         print(f"mesaj_isle hatası: {type(e).__name__}: {e}\n{traceback.format_exc()}")
@@ -558,7 +555,10 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
         context.user_data["secilen_ders"] = None
 
         await _soru_gonder(query.message.chat_id, context, 0)
-        gunluk_mesaj_artir(user_id)
+        try:
+            gunluk_mesaj_artir(user_id)
+        except Exception as e:
+            print(f"DB güncelleme hatası: {type(e).__name__}: {e}")
 
     except json.JSONDecodeError:
         print(f"JSON parse hatası:\n{traceback.format_exc()}")
