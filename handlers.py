@@ -654,8 +654,7 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kullanici_olustur(user_id)
     durum = kullanici_durumu(user_id)
 
-    # Sadece soru çözdür modunda fotoğraf kabul et
-    beklenen = context.user_data.get("beklened_islem")
+    beklenen = context.user_data.get("beklenen_islem")
     if beklenen != "sor":
         await update.message.reply_text(
             "📸 Fotoğraf göndermek için önce *Soru Çözdür* seçeneğine bas!",

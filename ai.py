@@ -184,7 +184,7 @@ def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: boo
 # ───────────────────────────────────────────
 
 def soru_hazirla(konu: str, ders: str, sinav_turu: str, abone_mi: bool = False) -> str:
-    model = "claude-sonnet-4-5" if abone_mi else "claude-haiku-4-5"
+    model = "claude-sonnet-4-5"
 
     response = client.messages.create(
         model=model,
@@ -215,12 +215,12 @@ DOGRU_CEVAP: (sadece harf)"""
 
 def konu_dogrula(konu: str, ders: str, sinav_turu: str) -> bool:
     response = client.messages.create(
-        model="claude-haiku-4-5",
+        model = "claude-sonnet-4-5",
         max_tokens=10,
         messages=[{
             "role": "user",
-            "content": f"""{sinav_turu} sınavının {ders} dersinde "{konu}" konusu veya buna benzer bir konu var mı?
-Geniş yorumla, İngilizce kelimeler de olabilir.
+            "content": f"""{sinav_turu} sınavının {ders} dersinde "{konu}" konusu veya buna yakın bir konu var mı?
+Geniş yorumla, kısaltmalar ve farklı yazımlar da kabul et.
 Sadece "EVET" veya "HAYIR" yaz."""
         }]
     )
@@ -228,7 +228,7 @@ Sadece "EVET" veya "HAYIR" yaz."""
 
 
 def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
-    model = "claude-sonnet-4-5" if abone_mi else "claude-haiku-4-5"
+    model = "claude-sonnet-4-5"
 
     response = client.messages.create(
         model=model,
