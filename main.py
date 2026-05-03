@@ -1,5 +1,4 @@
 import os
-import asyncio
 from dotenv import load_dotenv
 
 from telegram import Update
@@ -33,7 +32,7 @@ from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi, odeme_sec
 load_dotenv()
 
 
-async def _api_test():
+async def _api_test(app):
     """Bot başlarken Anthropic API bağlantısını test eder."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
@@ -55,9 +54,8 @@ async def _api_test():
 
 def main():
     tablolari_olustur()
-    asyncio.run(_api_test())
 
-    app = ApplicationBuilder().token(os.getenv("TELEGRAM_TOKEN")).build()
+    app = ApplicationBuilder().token(os.getenv("TELEGRAM_TOKEN")).post_init(_api_test).build()
 
     # ── Komutlar ──────────────────────────────
     app.add_handler(CommandHandler("baslat", baslat))
