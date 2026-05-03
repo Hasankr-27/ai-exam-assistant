@@ -277,19 +277,6 @@ DOGRU_CEVAP: (sadece harf)"""
     return response.content[0].text
 
 
-def konu_dogrula(konu: str, ders: str, sinav_turu: str) -> bool:
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=10,
-        messages=[{
-            "role": "user",
-            "content": f"""{sinav_turu} sınavının {ders} dersinde "{konu}" konusu veya buna yakın bir konu var mı?
-Geniş yorumla, kısaltmalar ve farklı yazımlar da kabul et.
-Sadece "EVET" veya "HAYIR" yaz."""
-        }]
-    )
-    return "EVET" in response.content[0].text.strip().upper()
-
 
 def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
     response = client.messages.create(
