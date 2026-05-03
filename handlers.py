@@ -460,24 +460,31 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     prompt = f"""
 Sen bir {sinav} sınav uzmanısın. SADECE {sinav} sınavının {ders} dersinden soru hazırlıyorsun.
-{sinav} {ders} müfredatı dışına KESINLIKLE çıkma! Üniversite düzeyi sorular YASAK!
+{sinav} {ders} müfredatı dışına KESINLIKLE çıkma!
 
 {sinav} sınavı {ders} dersi {konu} konusu ile ilgili {sayi} adet çoktan seçmeli soru hazırla.{gecmis_metin}
+
+ÖNEMLİ KURALLAR:
+- Her soruyu hazırlamadan önce cevabını kendин hesapla/doğrula
+- Doğru cevap şıklarda MUTLAKA bulunmalı
+- Yanlış şıklar makul ama kesinlikle yanlış olmalı
+- Gerçek {sinav} sınav zorluk seviyesinde olsun
+- Sorular birbirinden farklı alt konuları kapsasın
 
 Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yazma.
 [
   {{
     "soru": "Soru metni...\\nA) ...\\nB) ...\\nC) ...\\nD) ...\\nE) ...",
     "cevap": "A",
-    "cozum": "2-3 cümlelik kısa çözüm açıklaması."
+    "cozum": "Adım adım çözüm: neden bu cevap doğru, diğerleri neden yanlış."
   }}
 ]
 """
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=2500,
+            model="claude-sonnet-4-6",
+            max_tokens=4000,
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -696,8 +703,8 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sinav = durum["sinav_turu"] or "ÖSYM"
 
         response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1000,
+            model="claude-sonnet-4-6",
+            max_tokens=2000,
             messages=[{
                 "role": "user",
                 "content": [
@@ -711,7 +718,14 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     },
                     {
                         "type": "text",
-                        "text": f"Bu {sinav} sınav sorusunu adım adım çöz. Kısa ve net açıkla, sonucu belirt."
+                        "text": f"""Bu {sinav} sınav sorusunu çöz.
+
+1. Önce soruyu ve şıkları oku
+2. Adım adım çözümü göster (matematiksel işlemleri açık yaz)
+3. Yanlış şıkların neden eleneceğini belirt
+4. En sona: ✅ Doğru cevap: [şık harfi] - [şık metni]
+
+Net ve anlaşılır Türkçe kullan."""
                     }
                 ]
             }]
