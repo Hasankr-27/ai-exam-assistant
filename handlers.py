@@ -4,7 +4,7 @@ import time
 import base64
 import json
 
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -20,7 +20,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # ───────────────────────────────────────────
 # RATE LİMİTİNG
@@ -356,7 +356,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 7) Intent filtre - sadece genel sohbette
-    if beklenen == "genel" and not intent_kontrol(metin):
+    if beklenen == "genel" and not await intent_kontrol(metin):
         await update.message.reply_text(ALAKASIZ_MESAJ)
         return
 
@@ -377,9 +377,8 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
-                f"📝 *{metin}* konusunda kaç soru hazırlayayım?",
+                f"📝 {metin} konusunda kaç soru hazırlayayım?",
                 reply_markup=reply_markup,
-                parse_mode="Markdown"
             )
             return
 
@@ -389,7 +388,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parcalar = metin.replace(" ", "").split(",")
                 gun = int(''.join(filter(str.isdigit, parcalar[0])))
                 saat = int(''.join(filter(str.isdigit, parcalar[1])))
-                cevap = calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
+                cevap = await calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
                 context.user_data["beklenen_islem"] = None
             except:
                 await update.message.reply_text(
@@ -402,7 +401,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             gecmis = context.user_data.get("sohbet_gecmisi", [])
             # Herkes için Sonnet kullan (doğruluk için)
-            cevap = ai_cevap_al(metin, sinav, gecmis, True)
+            cevap = await ai_cevap_al(metin, sinav, gecmis, True)
 
             gecmis.append({"role": "user", "content": metin})
             gecmis.append({"role": "assistant", "content": cevap})
@@ -476,7 +475,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 """
 
     try:
-        response = client.messages.create(
+        response = await client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}]
@@ -696,7 +695,7 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         sinav = durum["sinav_turu"] or "ÖSYM"
 
-        response = client.messages.create(
+        response = await client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2000,
             messages=[{

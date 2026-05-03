@@ -1,10 +1,10 @@
 import os
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # ───────────────────────────────────────────
 # SINAV DERSLERİ
@@ -79,7 +79,6 @@ SINAV_DERSLERI = {
         "Çeviri": "türkçe-rusça çeviri",
     },
 }
-
 
 
 
@@ -208,9 +207,9 @@ Soru çözerken: Adımları numaralandır, doğru cevabı açıkça belirt. Tür
 # INTENT FILTER
 # ───────────────────────────────────────────
 
-def intent_kontrol(mesaj: str) -> bool:
-    response = client.messages.create(
-        model="claude-haiku-4-5",
+async def intent_kontrol(mesaj: str) -> bool:
+    response = await client.messages.create(
+        model="claude-haiku-4-5-20251001",
         max_tokens=10,
         messages=[
             {
@@ -224,19 +223,18 @@ Mesaj: {mesaj}"""
             }
         ]
     )
-    cevap = response.content[0].text.strip().upper()
-    return cevap == "EVET"
+    return "EVET" in response.content[0].text.strip().upper()
 
 
 # ───────────────────────────────────────────
 # ANA AI FONKSİYONU
 # ───────────────────────────────────────────
 
-def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
+async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: bool = False) -> str:
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["DIGER"])
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
 
-    response = client.messages.create(
+    response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=3000,
         system=sistem,
@@ -246,40 +244,11 @@ def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_mi: boo
 
 
 # ───────────────────────────────────────────
-# SORU HAZIRLA
+# ÇALIŞMA PLANI
 # ───────────────────────────────────────────
 
-def soru_hazirla(konu: str, ders: str, sinav_turu: str, abone_mi: bool = False) -> str:
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=600,
-        messages=[{
-            "role": "user",
-            "content": f"""{sinav_turu} sınavı {ders} dersi için {konu} konusunda 1 çoktan seçmeli soru hazırla.
-
-ÖNEMLİ KURALLAR:
-1. Önce soruyu çöz ve doğru cevabı bul
-2. Doğru cevabın şıklarda olduğundan %100 emin ol
-3. Her adımı iki kez kontrol et
-4. Eğer doğru cevap şıklarda yoksa soruyu baştan yaz
-5. Gerçek {sinav_turu} sınav tarzında, zorluk seviyesinde olsun
-
-Format:
-❓ Soru: ...
-A) ...
-B) ...
-C) ...
-D) ...
-E) ...
-DOGRU_CEVAP: (sadece harf)"""
-        }]
-    )
-    return response.content[0].text
-
-
-
-def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
-    response = client.messages.create(
+async def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
+    response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1500,
         messages=[{
