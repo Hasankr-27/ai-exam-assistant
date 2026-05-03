@@ -399,7 +399,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 gun = int(''.join(filter(str.isdigit, parcalar[0])))
                 saat = int(''.join(filter(str.isdigit, parcalar[1])))
                 cevap = calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
-                context.user_data["beklened_islem"] = None
+                context.user_data["beklenen_islem"] = None
             except:
                 await update.message.reply_text(
                     "⚠️ Şu formatta yaz:\n*47 gün, 7 saat*",
@@ -427,7 +427,10 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif kalan == 0:
                 cevap += "\n\n⛔ *Bugünlük ücretsiz hakkın bitti.* Yarın yenilenecek veya /abone yazabilirsin."
 
-        await update.message.reply_text(cevap, parse_mode="Markdown")
+        try:
+            await update.message.reply_text(cevap, parse_mode="Markdown")
+        except Exception:
+            await update.message.reply_text(cevap)
         await _menu_goster(update, sinav)
 
     except Exception as e:
@@ -505,7 +508,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 
         context.user_data["gecmis_sorular"] = gecmis_sorular
         context.user_data["toplam_soru"] = len(sorular)
-        context.user_data["beklened_islem"] = None
+        context.user_data["beklenen_islem"] = None
         context.user_data["secilen_ders"] = None
 
         await _soru_gonder(query.message.chat_id, context, 0)
@@ -734,7 +737,10 @@ Net ve anlaşılır Türkçe kullan."""
         cevap = response.content[0].text
         gunluk_mesaj_artir(user_id)
 
-        await update.message.reply_text(cevap, parse_mode="Markdown")
+        try:
+            await update.message.reply_text(cevap, parse_mode="Markdown")
+        except Exception:
+            await update.message.reply_text(cevap)
         await _menu_goster(update, sinav)
 
     except Exception as e:
