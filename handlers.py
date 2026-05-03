@@ -3,6 +3,7 @@ from datetime import datetime
 import time
 import base64
 import json
+import traceback
 
 from anthropic import AsyncAnthropic
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -424,13 +425,67 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _menu_goster(update, sinav)
 
     except Exception as e:
+        print(f"mesaj_isle hatası: {type(e).__name__}: {e}\n{traceback.format_exc()}")
         await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
-        print(f"Hata: {e}")
 
 
 # ───────────────────────────────────────────
 # SORU SAYISI SEÇİMİ (callback)
 # ───────────────────────────────────────────
+
+def _json_onar(metin: str) -> str:
+    """JSON string değerlerindeki literal newline'ları kaçış dizisiyle değiştirir."""
+    sonuc = []
+    string_icinde = False
+    i = 0
+    while i < len(metin):
+        kar = metin[i]
+        if kar == '\\' and i + 1 < len(metin):
+            sonuc.append(kar)
+            sonuc.append(metin[i + 1])
+            i += 2
+            continue
+        if kar == '"':
+            string_icinde = not string_icinde
+        if string_icinde and kar == '\n':
+            sonuc.append('\\n')
+        elif string_icinde and kar == '\r':
+            sonuc.append('\\r')
+        else:
+            sonuc.append(kar)
+        i += 1
+    return ''.join(sonuc)
+
+
+def _json_ayikla(metin: str) -> list:
+    """Modelin cevabından JSON array'i bulup parse eder."""
+    metin = metin.strip()
+
+    # Kod bloğu temizle
+    if '```json' in metin:
+        metin = metin.split('```json')[1].split('```')[0].strip()
+    elif '```' in metin:
+        metin = metin.split('```')[1].split('```')[0].strip()
+
+    # JSON array'i bul
+    if not metin.startswith('['):
+        bas = metin.find('[')
+        son = metin.rfind(']')
+        if bas != -1 and son > bas:
+            metin = metin[bas:son + 1]
+
+    # Direkt parse dene
+    try:
+        return json.loads(metin)
+    except json.JSONDecodeError:
+        pass
+
+    # Literal newline'ları düzelterek tekrar dene
+    try:
+        return json.loads(_json_onar(metin))
+    except json.JSONDecodeError:
+        raise
+
 
 async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -442,6 +497,13 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     durum = kullanici_durumu(user_id)
     sinav = durum["sinav_turu"]
+
+    # Oturum süresi dolmuşsa (bot yeniden başlatıldıysa context temizlenir)
+    if not konu or not ders or not sinav:
+        await query.edit_message_text(
+            "⚠️ Oturum süresi doldu.\nLütfen /start ile yeniden başla."
+        )
+        return
 
     await query.edit_message_text(f"⏳ {sayi} soru hazırlanıyor...")
 
@@ -482,13 +544,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
         )
 
         cikti = response.content[0].text.strip()
-
-        if cikti.startswith("```json"):
-            cikti = cikti[7:-3].strip()
-        elif cikti.startswith("```"):
-            cikti = cikti[3:-3].strip()
-
-        sorular = json.loads(cikti)
+        sorular = _json_ayikla(cikti)
 
         for i, soru_data in enumerate(sorular):
             context.user_data[f"soru_{i}"] = soru_data["soru"]
@@ -505,9 +561,10 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
         gunluk_mesaj_artir(user_id)
 
     except json.JSONDecodeError:
+        print(f"JSON parse hatası:\n{traceback.format_exc()}")
         await query.edit_message_text("⚠️ Format hatası, tekrar dener misin?")
     except Exception as e:
-        print(f"Hata: {e}")
+        print(f"soru_sayisi_sec hatası: {type(e).__name__}: {e}\n{traceback.format_exc()}")
         await query.edit_message_text("⚠️ Bir hata oluştu, tekrar dener misin?")
 
 
