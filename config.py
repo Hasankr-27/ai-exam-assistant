@@ -17,7 +17,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 BOT_ADI = "Sınav Asistanı"
 UCRETSIZ_HAK = 7          # Yeni kullanıcıya verilen ücretsiz hak
 GUNLUK_LIMIT = 70         # Abonelere günlük mesaj limiti
-ABONELIK_STARS = 50        # 1 aylık
+ABONELIK_STARS = 60        # 1 aylık
 ABONELIK_3AY_STARS = 150   # 3 aylık
 
 # Telegram Stars — 1 Star ≈ 0.013$ civarı
