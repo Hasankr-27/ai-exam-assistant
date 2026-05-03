@@ -47,7 +47,7 @@ ABONELIK_MESAJI = (
     "📚 Devam etmek için abone ol:\n"
     "• Günde 70 mesaj hakkı\n"
     "• 1 Aylık → 60 ⭐\n"
-    "• 3 Aylık → 180 ⭐\n\n"
+    "• 3 Aylık → 150 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
 
