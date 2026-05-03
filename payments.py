@@ -21,7 +21,7 @@ async def abone_ol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("1 Aylık — 50 ⭐", callback_data="odeme_1ay"),
+            InlineKeyboardButton("1 Aylık — 60 ⭐", callback_data="odeme_1ay"),
             InlineKeyboardButton("3 Aylık — 150 ⭐", callback_data="odeme_3ay"),
         ]
     ]
@@ -29,7 +29,7 @@ async def abone_ol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "💳 Abonelik seçenekleri:\n\n"
-        "• 1 Aylık → 50 Stars\n"
+        "• 1 Aylık → 60 Stars\n"
         "• 3 Aylık → 150 Stars (%20 indirimli 🎉)\n\n"
         "Hangisini tercih edersin?",
         reply_markup=reply_markup,
