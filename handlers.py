@@ -37,8 +37,8 @@ BEKLEME_SURESI = 3
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 200 ⭐!",
-    "ucret":      "💳 Aylık abonelik 80 ⭐ — 3 aylık 200 ⭐!",
+    "fiyat":      "💳 Aylık abonelik 60 ⭐ — 3 aylık 150 ⭐!",
+    "ucret":      "💳 Aylık abonelik 60 ⭐ — 3 aylık 150 ⭐!",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES, YDT sınavlarında uzman bir asistanım!",
 }
 
@@ -46,8 +46,8 @@ ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
     "• Günde 70 mesaj hakkı\n"
-    "• 1 Aylık → 80 ⭐\n"
-    "• 3 Aylık → 200 ⭐\n\n"
+    "• 1 Aylık → 60 ⭐\n"
+    "• 3 Aylık → 180 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
 
