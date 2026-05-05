@@ -33,7 +33,8 @@ load_dotenv()
 
 
 async def _api_test(app):
-    """Bot başlarken Anthropic API bağlantısını test eder."""
+    """Bot başlarken tabloları oluşturur ve Anthropic API bağlantısını test eder."""
+    await tablolari_olustur()
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         print("❌ ANTHROPIC_API_KEY ayarlanmamış! AI özellikleri çalışmaz.")
@@ -53,8 +54,6 @@ async def _api_test(app):
 
 
 def main():
-    tablolari_olustur()
-
     app = ApplicationBuilder().token(os.getenv("TELEGRAM_TOKEN")).post_init(_api_test).build()
 
     # ── Komutlar ──────────────────────────────

@@ -10,7 +10,7 @@ from config import ABONELIK_STARS, ABONELIK_3AY_STARS
 
 async def abone_ol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    durum = kullanici_durumu(user_id)
+    durum = await kullanici_durumu(user_id)
 
     if durum["abone_mi"]:
         await update.message.reply_text(
@@ -86,7 +86,7 @@ async def on_odeme_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def odeme_tamamlandi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     gun = context.user_data.get("abonelik_gun", 30)
-    abone_yap(user_id, gun=gun)
+    await abone_yap(user_id, gun=gun)
 
     await update.message.reply_text(
         f"🎉 Ödeme alındı, hoş geldin!\n\n"
