@@ -73,7 +73,7 @@ MENU_SEC_MESAJI = (
 
 async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     isim = update.effective_user.first_name
-    kullanici_olustur(update.effective_user.id)
+    await kullanici_olustur(update.effective_user.id)
     context.user_data["beklenen_islem"] = None
 
     keyboard = [
@@ -141,7 +141,7 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    sinav_turu_guncelle(user_id, sinav)
+    await sinav_turu_guncelle(user_id, sinav)
     context.user_data["beklenen_islem"] = None
     await _menu_goster_query(query, sinav)
 
@@ -185,7 +185,7 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     islem = query.data.replace("islem_", "")
     user_id = query.from_user.id
-    durum = kullanici_durumu(user_id)
+    durum = await kullanici_durumu(user_id)
     sinav = durum["sinav_turu"] or "YKS"
 
     # Soru hazırla → önce dersler çıksın
@@ -260,7 +260,7 @@ async def geri_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["beklenen_islem"] = None
-    durum = kullanici_durumu(query.from_user.id)
+    durum = await kullanici_durumu(query.from_user.id)
     sinav = durum["sinav_turu"] or "YKS"
     await _menu_goster_query(query, sinav)
 
@@ -309,8 +309,8 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 2) Kullanıcıyı oluştur / getir
-    kullanici_olustur(user_id)
-    durum = kullanici_durumu(user_id)
+    await kullanici_olustur(user_id)
+    durum = await kullanici_durumu(user_id)
 
     # 3) Sınav türü seçilmiş mi?
     if not durum["sinav_turu"]:
@@ -320,7 +320,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 4) Hak kontrolü
-    hak_durumu = mesaj_hakki_kontrol(user_id, durum["abone_mi"])
+    hak_durumu = await mesaj_hakki_kontrol(user_id, durum["abone_mi"])
 
     if not durum["abone_mi"] and not hak_durumu["izin_ver"]:
         await update.message.reply_text(
@@ -417,7 +417,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Sonra hak güncelle (hata verse bile cevap zaten gönderildi)
         try:
-            gunluk_mesaj_artir(user_id)
+            await gunluk_mesaj_artir(user_id)
         except Exception as e:
             print(f"DB güncelleme hatası: {type(e).__name__}: {e}")
 
@@ -492,7 +492,7 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     konu = context.user_data.get("soru_konusu", "")
     ders = context.user_data.get("secilen_ders", "")
     user_id = query.from_user.id
-    durum = kullanici_durumu(user_id)
+    durum = await kullanici_durumu(user_id)
     sinav = durum["sinav_turu"]
 
     # Oturum süresi dolmuşsa (bot yeniden başlatıldıysa context temizlenir)
@@ -556,7 +556,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 
         await _soru_gonder(query.message.chat_id, context, 0)
         try:
-            gunluk_mesaj_artir(user_id)
+            await gunluk_mesaj_artir(user_id)
         except Exception as e:
             print(f"DB güncelleme hatası: {type(e).__name__}: {e}")
 
@@ -629,7 +629,7 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if index + 1 < toplam:
         await _soru_gonder(query.message.chat_id, context, index + 1)
     else:
-        durum = kullanici_durumu(query.from_user.id)
+        durum = await kullanici_durumu(query.from_user.id)
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text="🎉 Test bitti! Sonuçlarını yukarıdan inceleyebilirsin."
@@ -708,8 +708,8 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    kullanici_olustur(user_id)
-    durum = kullanici_durumu(user_id)
+    await kullanici_olustur(user_id)
+    durum = await kullanici_durumu(user_id)
 
     beklenen = context.user_data.get("beklenen_islem")
     if beklenen != "sor":
@@ -719,7 +719,7 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    hak_durumu = mesaj_hakki_kontrol(user_id, durum["abone_mi"])
+    hak_durumu = await mesaj_hakki_kontrol(user_id, durum["abone_mi"])
     if not hak_durumu["izin_ver"]:
         if durum["abone_mi"]:
             await update.message.reply_text(LIMIT_MESAJI)
@@ -782,7 +782,7 @@ Net ve anlaşılır Türkçe kullan."""
         )
 
         cevap = response.content[0].text
-        gunluk_mesaj_artir(user_id)
+        await gunluk_mesaj_artir(user_id)
 
         try:
             await update.message.reply_text(cevap, parse_mode="Markdown")

@@ -237,8 +237,12 @@ async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_m
     response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=3000,
-        system=sistem,
-        messages=mesajlar
+        system=[{
+            "type": "text",
+            "text": sistem,
+            "cache_control": {"type": "ephemeral"},
+        }],
+        messages=mesajlar,
     )
     return response.content[0].text
 
