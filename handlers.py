@@ -294,7 +294,7 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    metin = update.message.text.lower().strip()
+    metin = update.message.text.lower().strip()[:2000]
 
     # 0) Rate limit kontrolü
     simdi = time.time()
@@ -391,7 +391,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 saat = int(''.join(filter(str.isdigit, parcalar[1])))
                 cevap = await calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
                 context.user_data["beklenen_islem"] = None
-            except:
+            except (ValueError, IndexError):
                 await update.message.reply_text(
                     "⚠️ Şu formatta yaz:\n*47 gün, 7 saat*",
                     parse_mode="Markdown"
