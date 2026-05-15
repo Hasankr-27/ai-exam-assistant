@@ -179,6 +179,15 @@ async def _aboneligi_iptal_et(user_id: int):
 async def kullanici_durumu(user_id: int) -> dict:
     await kullanici_olustur(user_id)
     k = await kullanici_getir(user_id)
+    if k is None:
+        return {
+            "user_id":             user_id,
+            "sinav_turu":          None,
+            "kalan_hak":           7,
+            "abone_mi":            False,
+            "abone_bitis_tarihi":  None,
+            "gunluk_mesaj_sayisi": 0,
+        }
     abone = await abonelik_kontrol(user_id)
 
     return {
