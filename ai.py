@@ -224,7 +224,7 @@ Mesaj: {mesaj}"""
                 }
             ]
         )
-        if not response.content:
+        if not response.content or not hasattr(response.content[0], "text"):
             return True
         return "EVET" in response.content[0].text.strip().upper()
     except Exception:
@@ -249,7 +249,7 @@ async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_m
         }],
         messages=mesajlar,
     )
-    if not response.content:
+    if not response.content or not hasattr(response.content[0], "text"):
         raise ValueError("Anthropic API boş yanıt döndürdü.")
     return response.content[0].text
 
@@ -275,6 +275,6 @@ Bana haftalık detaylı çalışma programı hazırla:
 Kısa ve uygulanabilir olsun, madde madde yaz."""
         }]
     )
-    if not response.content:
+    if not response.content or not hasattr(response.content[0], "text"):
         raise ValueError("Anthropic API boş yanıt döndürdü.")
     return response.content[0].text

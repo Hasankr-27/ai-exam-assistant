@@ -72,7 +72,7 @@ MENU_SEC_MESAJI = (
 # ───────────────────────────────────────────
 
 async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    isim = update.effective_user.first_name
+    isim = update.effective_user.first_name if update.effective_user else "Öğrenci"
     await kullanici_olustur(update.effective_user.id)
     context.user_data["beklenen_islem"] = None
 
@@ -91,7 +91,7 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(
+    hosgeldin = (
         f"👋 Merhaba {isim}!\n\n"
         "🎯 *Sınav Asistanına Hoş Geldin!*\n\n"
         "📚 Yapay zeka destekli asistanın ile:\n"
@@ -99,10 +99,12 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ Soru hazırlat ve çöz\n"
         "✅ Çalışma planı oluştur\n"
         "✅ Takıldığın soruyu çözdür\n\n"
-        "👇 Hangi sınava hazırlanıyorsun?",
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
+        "👇 Hangi sınava hazırlanıyorsun?"
     )
+    try:
+        await update.message.reply_text(hosgeldin, reply_markup=reply_markup, parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text(hosgeldin.replace("*", ""), reply_markup=reply_markup)
 
 
 # ───────────────────────────────────────────
@@ -335,7 +337,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 5) beklenen ve sinav
     beklenen = context.user_data.get("beklenen_islem", None)
-    sinav = durum["sinav_turu"]
+    sinav = durum["sinav_turu"] or "YKS"
 
     # 6) Menüden seçim yapılmamışsa engelle
     if not beklenen:
@@ -547,13 +549,15 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
             return
 
         for i, soru_data in enumerate(sorular):
+            if not isinstance(soru_data, dict):
+                continue
             context.user_data[f"soru_{i}"] = soru_data.get("soru", "")
             context.user_data[f"cevap_{i}"] = soru_data.get("cevap", "A")
             context.user_data[f"cozum_{i}"] = soru_data.get("cozum", "")
             if soru_data.get("soru"):
                 gecmis_sorular.append(soru_data["soru"])
 
-        context.user_data["gecmis_sorular"] = gecmis_sorular
+        context.user_data["gecmis_sorular"] = gecmis_sorular[-20:]
         context.user_data["toplam_soru"] = len(sorular)
         context.user_data["beklenen_islem"] = None
         context.user_data["secilen_ders"] = None
@@ -585,9 +589,13 @@ async def _soru_gonder(chat_id, context, index):
     ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    metin = f"📊 Soru {index+1}/{toplam}\n\n{soru}"
+    if len(metin) > 4096:
+        metin = metin[:4093] + "..."
+
     await context.bot.send_message(
         chat_id=chat_id,
-        text=f"📊 Soru {index+1}/{toplam}\n\n{soru}",
+        text=metin,
         reply_markup=reply_markup,
     )
 
@@ -645,7 +653,7 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=query.message.chat_id,
             text="🎉 Test bitti! Sonuçlarını yukarıdan inceleyebilirsin."
         )
-        await _menu_goster_chat(query.message.chat_id, context, durum["sinav_turu"])
+        await _menu_goster_chat(query.message.chat_id, context, durum["sinav_turu"] or "YKS")
 
 
 # ───────────────────────────────────────────
@@ -763,7 +771,6 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
@@ -806,6 +813,9 @@ Net ve anlaşılır Türkçe kullan."""
         if not response.content:
             raise ValueError("Anthropic API boş yanıt döndürdü.")
         cevap = response.content[0].text
+
+        # Başarılı — sayacı şimdi artır
+        context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
 
         await _gonder_metin(update.message, cevap)
         await _menu_goster(update, sinav)
