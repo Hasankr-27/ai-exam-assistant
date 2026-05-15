@@ -361,9 +361,9 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(ALAKASIZ_MESAJ)
         return
 
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-
     try:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+
         # ── SORU KONUSU GELDİ ──
         if beklenen == "soru" and context.user_data.get("secilen_ders"):
             context.user_data["soru_konusu"] = metin
@@ -409,10 +409,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
         # Önce cevabı gönder
-        try:
-            await update.message.reply_text(cevap, parse_mode="Markdown")
-        except Exception:
-            await update.message.reply_text(cevap)
+        await _gonder_metin(update.message, cevap)
         await _menu_goster(update, sinav)
 
         # Sonra hak güncelle (hata verse bile cevap zaten gönderildi)
@@ -540,14 +537,21 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
             messages=[{"role": "user", "content": prompt}]
         )
 
+        if not response.content:
+            raise ValueError("Anthropic API boş yanıt döndürdü.")
         cikti = response.content[0].text.strip()
         sorular = _json_ayikla(cikti)
 
+        if not sorular:
+            await query.edit_message_text("⚠️ Soru üretilemedi, tekrar dener misin?")
+            return
+
         for i, soru_data in enumerate(sorular):
-            context.user_data[f"soru_{i}"] = soru_data["soru"]
-            context.user_data[f"cevap_{i}"] = soru_data["cevap"]
-            context.user_data[f"cozum_{i}"] = soru_data["cozum"]
-            gecmis_sorular.append(soru_data["soru"])
+            context.user_data[f"soru_{i}"] = soru_data.get("soru", "")
+            context.user_data[f"cevap_{i}"] = soru_data.get("cevap", "A")
+            context.user_data[f"cozum_{i}"] = soru_data.get("cozum", "")
+            if soru_data.get("soru"):
+                gecmis_sorular.append(soru_data["soru"])
 
         context.user_data["gecmis_sorular"] = gecmis_sorular
         context.user_data["toplam_soru"] = len(sorular)
@@ -602,6 +606,9 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     parcalar = query.data.split("_")
+    if len(parcalar) < 3:
+        await query.edit_message_text("⚠️ Geçersiz işlem. Yeni soru hazırlat!")
+        return
     index = int(parcalar[1])
     kullanici_cevabi = parcalar[2]
 
@@ -614,17 +621,21 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⚠️ Bot yeniden başladı, lütfen yeni soru hazırlat!")
         return
 
+    cozum_metin = cozum or "Çözüm kaydedilmemiş."
     if kullanici_cevabi == dogru_cevap:
-        mesaj = f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉\n\n📝 {cozum}"
+        mesaj = f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n✅ Doğru! Tebrikler 🎉\n\n📝 {cozum_metin}"
     else:
         mesaj = (
             f"📊 Soru {index+1}/{toplam}\n\n{soru}\n\n"
             f"❌ Yanlış! Seçtiğin: {kullanici_cevabi}\n"
             f"✅ Doğru: {dogru_cevap}\n\n"
-            f"📝 {cozum}"
+            f"📝 {cozum_metin}"
         )
 
-    await query.edit_message_text(mesaj)
+    try:
+        await query.edit_message_text(mesaj)
+    except Exception:
+        await query.edit_message_text(mesaj[:4096])
 
     if index + 1 < toplam:
         await _soru_gonder(query.message.chat_id, context, index + 1)
@@ -640,6 +651,17 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ───────────────────────────────────────────
 # YARDIMCI: menü göster
 # ───────────────────────────────────────────
+
+async def _gonder_metin(mesaj_obj, metin: str):
+    """4096 karakter sınırını aşan metinleri parçalara bölerek gönderir."""
+    MAX = 4000
+    parcalar = [metin[i:i+MAX] for i in range(0, len(metin), MAX)]
+    for parca in parcalar:
+        try:
+            await mesaj_obj.reply_text(parca, parse_mode="Markdown")
+        except Exception:
+            await mesaj_obj.reply_text(parca)
+
 
 async def _menu_goster(update: Update, sinav: str):
     keyboard = [
@@ -781,14 +803,17 @@ Net ve anlaşılır Türkçe kullan."""
             }]
         )
 
+        if not response.content:
+            raise ValueError("Anthropic API boş yanıt döndürdü.")
         cevap = response.content[0].text
-        await gunluk_mesaj_artir(user_id)
+
+        await _gonder_metin(update.message, cevap)
+        await _menu_goster(update, sinav)
 
         try:
-            await update.message.reply_text(cevap, parse_mode="Markdown")
-        except Exception:
-            await update.message.reply_text(cevap)
-        await _menu_goster(update, sinav)
+            await gunluk_mesaj_artir(user_id)
+        except Exception as db_err:
+            print(f"DB güncelleme hatası: {type(db_err).__name__}: {db_err}")
 
     except Exception as e:
         await update.message.reply_text("⚠️ Fotoğraf işlenemedi, tekrar dener misin?")

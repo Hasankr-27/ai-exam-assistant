@@ -208,22 +208,27 @@ Soru çözerken: Adımları numaralandır, doğru cevabı açıkça belirt. Tür
 # ───────────────────────────────────────────
 
 async def intent_kontrol(mesaj: str) -> bool:
-    response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=10,
-        messages=[
-            {
-                "role": "user",
-                "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS/ALES/YDT/ÖSYM).
+    try:
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=10,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS/ALES/YDT/ÖSYM).
 Kullanıcının mesajı sınav konularıyla, derslerle veya öğrenmek istediği bir şeyle ilgili mi?
 Eğitim, ders, konu, soru içeriyorsa EVET de.
 Sadece "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma.
 
 Mesaj: {mesaj}"""
-            }
-        ]
-    )
-    return "EVET" in response.content[0].text.strip().upper()
+                }
+            ]
+        )
+        if not response.content:
+            return True
+        return "EVET" in response.content[0].text.strip().upper()
+    except Exception:
+        return True
 
 
 # ───────────────────────────────────────────
@@ -244,6 +249,8 @@ async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_m
         }],
         messages=mesajlar,
     )
+    if not response.content:
+        raise ValueError("Anthropic API boş yanıt döndürdü.")
     return response.content[0].text
 
 
@@ -268,4 +275,6 @@ Bana haftalık detaylı çalışma programı hazırla:
 Kısa ve uygulanabilir olsun, madde madde yaz."""
         }]
     )
+    if not response.content:
+        raise ValueError("Anthropic API boş yanıt döndürdü.")
     return response.content[0].text
