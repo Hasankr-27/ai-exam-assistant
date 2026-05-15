@@ -139,9 +139,22 @@ async def _gunluk_sayac_sifirla(user_id: int, bugun: str):
 # ───────────────────────────────────────────
 
 async def abone_yap(user_id: int, gun: int = 30):
-    bitis = (datetime.now() + timedelta(days=gun)).strftime("%Y-%m-%d")
+    """Mevcut abonelik varsa üzerine ekler, yoksa bugünden başlatır."""
     pool = await _get_pool()
     async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT abone_bitis_tarihi FROM kullanicilar WHERE user_id = $1",
+            user_id
+        )
+        baslangic = datetime.now()
+        if row and row["abone_bitis_tarihi"]:
+            try:
+                mevcut_bitis = datetime.strptime(row["abone_bitis_tarihi"], "%Y-%m-%d")
+                if mevcut_bitis > baslangic:
+                    baslangic = mevcut_bitis
+            except (ValueError, TypeError):
+                pass
+        bitis = (baslangic + timedelta(days=gun)).strftime("%Y-%m-%d")
         await conn.execute("""
             UPDATE kullanicilar
             SET abone_mi = 1, abone_bitis_tarihi = $1
