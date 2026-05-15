@@ -143,9 +143,16 @@ async def sinav_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    await sinav_turu_guncelle(user_id, sinav)
-    context.user_data["beklenen_islem"] = None
-    await _menu_goster_query(query, sinav)
+    try:
+        await sinav_turu_guncelle(user_id, sinav)
+        context.user_data["beklenen_islem"] = None
+        await _menu_goster_query(query, sinav)
+    except Exception as e:
+        print(f"sinav_sec hatası: {type(e).__name__}: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, /start ile tekrar dene.")
+        except Exception:
+            pass
 
 
 # ───────────────────────────────────────────
@@ -187,7 +194,15 @@ async def islem_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     islem = query.data.replace("islem_", "")
     user_id = query.from_user.id
-    durum = await kullanici_durumu(user_id)
+    try:
+        durum = await kullanici_durumu(user_id)
+    except Exception as e:
+        print(f"islem_sec DB hatası: {type(e).__name__}: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, /start ile tekrar dene.")
+        except Exception:
+            pass
+        return
     sinav = durum["sinav_turu"] or "YKS"
 
     # Soru hazırla → önce dersler çıksın
@@ -262,7 +277,15 @@ async def geri_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["beklenen_islem"] = None
-    durum = await kullanici_durumu(query.from_user.id)
+    try:
+        durum = await kullanici_durumu(query.from_user.id)
+    except Exception as e:
+        print(f"geri_menu DB hatası: {type(e).__name__}: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, /start ile tekrar dene.")
+        except Exception:
+            pass
+        return
     sinav = durum["sinav_turu"] or "YKS"
     await _menu_goster_query(query, sinav)
 
@@ -276,18 +299,34 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     ders = query.data.replace("ders_", "")
+
+    # Prompt injection koruması: ders gerçekten bilinen bir ders mi?
+    gecerli = any(ders in dersler for dersler in SINAV_DERSLERI.values())
+    if not gecerli:
+        try:
+            await query.edit_message_text("⚠️ Geçersiz ders. Menüden tekrar seç.")
+        except Exception:
+            pass
+        return
+
     context.user_data["secilen_ders"] = ders
     context.user_data["beklenen_islem"] = "soru"
 
     keyboard = [[InlineKeyboardButton("🔙 Geri", callback_data="geri_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.edit_message_text(
-        f"✅ *{ders}* seçildi!\n\n"
-        "📝 Hangi konudan soru hazırlayayım?",
-        reply_markup=reply_markup,
-        parse_mode="Markdown",
-    )
+    try:
+        await query.edit_message_text(
+            f"✅ *{ders}* seçildi!\n\n"
+            "📝 Hangi konudan soru hazırlayayım?",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+    except Exception:
+        await query.edit_message_text(
+            f"✅ {ders} seçildi!\n\n📝 Hangi konudan soru hazırlayayım?",
+            reply_markup=reply_markup,
+        )
 
 
 # ───────────────────────────────────────────
