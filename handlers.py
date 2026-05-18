@@ -16,7 +16,7 @@ from database import (
     gunluk_mesaj_artir,
     mesaj_hakki_kontrol,
 )
-from ai import intent_kontrol, ai_cevap_al, SINAV_DERSLERI, calisma_plani_olustur
+from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur
 import os
 from dotenv import load_dotenv
 
@@ -349,8 +349,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(HAZIR_CEVAPLAR[metin])
         return
 
-    # 2) Kullanıcıyı oluştur / getir
-    await kullanici_olustur(user_id)
+    # 2) Kullanıcıyı getir (kullanici_durumu içinde otomatik oluşturur)
     durum = await kullanici_durumu(user_id)
 
     # 3) Sınav türü seçilmiş mi?
@@ -397,14 +396,8 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 7) Intent filtre - sadece genel sohbette
-    if beklenen == "genel" and not await intent_kontrol(metin):
-        await update.message.reply_text(ALAKASIZ_MESAJ)
-        return
-
+    placeholder = None
     try:
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-
         # ── SORU KONUSU GELDİ ──
         if beklenen == "soru" and context.user_data.get("secilen_ders"):
             context.user_data["soru_konusu"] = metin
@@ -416,11 +409,9 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("4", callback_data="sayi_4"),
                 InlineKeyboardButton("5", callback_data="sayi_5"),
             ]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
             await update.message.reply_text(
                 f"📝 {metin} konusunda kaç soru hazırlayayım?",
-                reply_markup=reply_markup,
+                reply_markup=InlineKeyboardMarkup(keyboard),
             )
             return
 
@@ -430,8 +421,6 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parcalar = metin.replace(" ", "").split(",")
                 gun = int(''.join(filter(str.isdigit, parcalar[0])))
                 saat = int(''.join(filter(str.isdigit, parcalar[1])))
-                cevap = await calisma_plani_olustur(gun, saat, sinav, durum["abone_mi"])
-                context.user_data["beklenen_islem"] = None
             except (ValueError, IndexError):
                 await update.message.reply_text(
                     "⚠️ Şu formatta yaz:\n*47 gün, 7 saat*",
@@ -439,21 +428,47 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-        # ── KONU ANLAT / SORU ÇÖZDÜR / GENEL ──
+            placeholder = await update.message.reply_text("⏳ Çalışma planın hazırlanıyor...")
+            cevap = ""
+            son_guncelleme = time.time()
+            async with calisma_plani_stream(gun, saat, sinav) as stream:
+                async for chunk in stream.text_stream:
+                    cevap += chunk
+                    simdi = time.time()
+                    if simdi - son_guncelleme >= 3.0 and cevap:
+                        try:
+                            goster = cevap[:3800] + " ..." if len(cevap) > 3800 else cevap + " ▌"
+                            await placeholder.edit_text(goster)
+                            son_guncelleme = simdi
+                        except Exception:
+                            pass
+            context.user_data["beklenen_islem"] = None
+
+        # ── KONU ANLAT / SORU ÇÖZDÜR ──
         else:
             gecmis = context.user_data.get("sohbet_gecmisi", [])
-            # Herkes için Sonnet kullan (doğruluk için)
-            cevap = await ai_cevap_al(metin, sinav, gecmis, True)
-
+            placeholder = await update.message.reply_text("⏳ Düşünüyorum...")
+            cevap = ""
+            son_guncelleme = time.time()
+            async with ai_cevap_al_stream(metin, sinav, gecmis) as stream:
+                async for chunk in stream.text_stream:
+                    cevap += chunk
+                    simdi = time.time()
+                    if simdi - son_guncelleme >= 3.0 and cevap:
+                        try:
+                            goster = cevap[:3800] + " ..." if len(cevap) > 3800 else cevap + " ▌"
+                            await placeholder.edit_text(goster)
+                            son_guncelleme = simdi
+                        except Exception:
+                            pass
             gecmis.append({"role": "user", "content": metin})
             gecmis.append({"role": "assistant", "content": cevap})
             context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
-        # Önce cevabı gönder
+        await placeholder.delete()
         await _gonder_metin(update.message, cevap)
         await _menu_goster(update, sinav)
 
-        # Sonra hak güncelle (hata verse bile cevap zaten gönderildi)
         try:
             await gunluk_mesaj_artir(user_id)
         except Exception as e:
@@ -461,7 +476,13 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         print(f"mesaj_isle hatası: {type(e).__name__}: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        if placeholder:
+            try:
+                await placeholder.edit_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+            except Exception:
+                await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        else:
+            await update.message.reply_text("⚠️ Bir hata oluştu, tekrar dener misin?")
 
 
 # ───────────────────────────────────────────
@@ -574,7 +595,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
     try:
         response = await client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4000,
+            max_tokens=2500,
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -777,7 +798,6 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    await kullanici_olustur(user_id)
     durum = await kullanici_durumu(user_id)
 
     beklenen = context.user_data.get("beklenen_islem")
