@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 from telegram import Update
 from telegram.ext import (
+    AIORateLimiter,
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
@@ -54,7 +55,13 @@ async def _api_test(app):
 
 
 def main():
-    app = ApplicationBuilder().token(os.getenv("TELEGRAM_TOKEN")).post_init(_api_test).build()
+    app = (
+        ApplicationBuilder()
+        .token(os.getenv("TELEGRAM_TOKEN"))
+        .rate_limiter(AIORateLimiter())
+        .post_init(_api_test)
+        .build()
+    )
 
     # ── Komutlar ──────────────────────────────
     app.add_handler(CommandHandler("baslat", baslat))
