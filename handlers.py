@@ -481,8 +481,10 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-            # Soru çözdür modunda sorumluluk reddi ekle
+            # Soru çözdür modunda sorumluluk reddi ekle + soruyu sakla
             if beklenen == "sor":
+                context.user_data["son_soru"] = metin
+                context.user_data["son_sinav"] = sinav
                 cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
             await _gonder_metin(update.message, cevap)
             if beklenen == "sor":
@@ -836,17 +838,127 @@ async def _menu_goster_sor(update: Update, sinav: str):
 async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
+    son_soru = context.user_data.get("son_soru")
+    sinav = context.user_data.get("son_sinav", "YKS")
+    user_id = query.from_user.id
+
+    if not son_soru:
+        try:
+            await query.edit_message_text("⚠️ Soru bulunamadı, lütfen soruyu tekrar yaz.")
+        except Exception:
+            pass
+        return
+
+    # Hak kontrolü
     try:
-        await query.edit_message_text(
-            "📝 Bildirimin için teşekkürler!\n\n"
-            "Yapay zeka bazen hata yapabilir. Bu soruyu:\n"
-            "• Ders kitabından\n"
-            "• Güvenilir bir kaynaktan\n"
-            "• Öğretmenine sorarak\n\n"
-            "kontrol etmeni öneririm. Başka bir soru sormak için menüyü kullan. 📚"
-        )
+        durum = await kullanici_durumu(user_id)
+        hak_durumu = await mesaj_hakkini_kullan(user_id, durum["abone_mi"])
+    except Exception as e:
+        print(f"yanlis_cevap hak hatası: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, tekrar dene.")
+        except Exception:
+            pass
+        return
+
+    if not hak_durumu["izin_ver"]:
+        try:
+            await query.edit_message_text(
+                "⏰ Mesaj hakkın bitti!\nYarın sıfırlanacak veya /abone yazarak devam edebilirsin."
+            )
+        except Exception:
+            pass
+        return
+
+    # Butonu kapat
+    try:
+        await query.edit_message_text("🔄 Soruyu dikkatlice yeniden çözüyorum...")
     except Exception:
         pass
+
+    # Yeni placeholder gönder
+    placeholder = await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text="⏳ Düşünüyorum..."
+    )
+
+    yeniden_prompt = (
+        "Bir öğrenci bu soruyu sana sordu ve verdiğin cevabın yanlış olduğunu bildirdi. "
+        "Soruyu baştan, çok dikkatli şekilde adım adım yeniden çöz. "
+        "Her işlemi tek tek kontrol et ve kesin olarak doğru cevabı bul:\n\n" + son_soru
+    )
+
+    cevap = ""
+    son_guncelleme = time.time()
+
+    try:
+        async with ai_cevap_al_stream(yeniden_prompt, sinav, []) as stream:
+            async for chunk in stream.text_stream:
+                cevap += chunk
+                simdi = time.time()
+                if simdi - son_guncelleme >= 3.0 and cevap:
+                    try:
+                        goster = cevap[:3800] + " ..." if len(cevap) > 3800 else cevap + " ▌"
+                        await placeholder.edit_text(goster)
+                        son_guncelleme = simdi
+                    except Exception:
+                        pass
+
+        if not cevap:
+            await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
+            return
+
+        try:
+            await placeholder.delete()
+        except Exception:
+            pass
+
+        cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve yine de hatalı olabilirim. Önemli sorularda kaynaktan kontrol et!"
+        # Yanıtı parçalara bölerek gönder
+        MAX = 4000
+        for parca in [cevap[i:i+MAX] for i in range(0, len(cevap), MAX)]:
+            try:
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id, text=parca, parse_mode="Markdown"
+                )
+            except Exception:
+                await context.bot.send_message(chat_id=query.message.chat_id, text=parca)
+
+        # Menü
+        keyboard = [
+            [InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap")],
+            [
+                InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+                InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+            ],
+            [
+                InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+                InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+            ],
+            [
+                InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+                InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+            ],
+        ]
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"📚 {sinav} — Başka ne yapmak istersin?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    except (RateLimitError, APIStatusError) as e:
+        print(f"yanlis_cevap API hatası: {e}")
+        try:
+            await placeholder.edit_text("⚠️ Sunucu şu an yoğun, 30 saniye sonra tekrar dene.")
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"yanlis_cevap hatası: {e}\n{traceback.format_exc()}")
+        try:
+            await placeholder.edit_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        except Exception:
+            pass
 
 
 async def _menu_goster_chat(chat_id, context, sinav: str):
@@ -980,6 +1092,8 @@ Net ve anlaşılır Türkçe kullan."""
 
         # Başarılı — foto sayacını artır (mesaj hakkı zaten mesaj_hakkini_kullan'da tüketildi)
         context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
+        context.user_data["son_soru"] = "📸 (Fotoğraftaki soru) — Lütfen soruyu tekrar metin olarak yaz."
+        context.user_data["son_sinav"] = sinav
 
         cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
         await _gonder_metin(update.message, cevap)
