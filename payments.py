@@ -85,7 +85,14 @@ async def on_odeme_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def odeme_tamamlandi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    gun = context.user_data.get("abonelik_gun", 30)
+
+    # Payload'dan gün sayısını doğrula (session temizlense bile doğru değer alınır)
+    payload = update.message.successful_payment.invoice_payload
+    if payload == "abonelik_90gun":
+        gun = 90
+    else:
+        gun = 30
+
     await abone_yap(user_id, gun=gun)
 
     await update.message.reply_text(

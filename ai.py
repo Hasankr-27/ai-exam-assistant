@@ -204,29 +204,6 @@ Soru çözerken: Adımları numaralandır, doğru cevabı açıkça belirt. Tür
 
 
 # ───────────────────────────────────────────
-# INTENT FILTER
-# ───────────────────────────────────────────
-
-async def intent_kontrol(mesaj: str) -> bool:
-    response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=10,
-        messages=[
-            {
-                "role": "user",
-                "content": f"""Sen bir sınav asistanısın (YKS/KPSS/DGS/ALES/YDT/ÖSYM).
-Kullanıcının mesajı sınav konularıyla, derslerle veya öğrenmek istediği bir şeyle ilgili mi?
-Eğitim, ders, konu, soru içeriyorsa EVET de.
-Sadece "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma.
-
-Mesaj: {mesaj}"""
-            }
-        ]
-    )
-    return "EVET" in response.content[0].text.strip().upper()
-
-
-# ───────────────────────────────────────────
 # ANA AI FONKSİYONU
 # ───────────────────────────────────────────
 
@@ -244,20 +221,28 @@ async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_m
         }],
         messages=mesajlar,
     )
+    if not response.content or not hasattr(response.content[0], "text"):
+        raise ValueError("Anthropic API boş yanıt döndürdü.")
     return response.content[0].text
+
+
+def ai_cevap_al_stream(mesaj: str, sinav_turu: str, sohbet_gecmisi: list):
+    """Streaming versiyonu — async context manager döndürür."""
+    sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["DIGER"])
+    mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
+    return client.messages.stream(
+        model="claude-sonnet-4-6",
+        max_tokens=3000,
+        system=[{"type": "text", "text": sistem, "cache_control": {"type": "ephemeral"}}],
+        messages=mesajlar,
+    )
 
 
 # ───────────────────────────────────────────
 # ÇALIŞMA PLANI
 # ───────────────────────────────────────────
 
-async def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
-    response = await client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1500,
-        messages=[{
-            "role": "user",
-            "content": f"""{sinav_turu} sınavına {gun} gün kaldı. Günde {saat} saat çalışabiliyorum.
+_CALISMA_PLANI_PROMPT = """{sinav_turu} sınavına {gun} gün kaldı. Günde {saat} saat çalışabiliyorum.
 
 Bana haftalık detaylı çalışma programı hazırla:
 - Her gün hangi ders kaç saat
@@ -266,6 +251,23 @@ Bana haftalık detaylı çalışma programı hazırla:
 - Deneme sınavı günleri
 
 Kısa ve uygulanabilir olsun, madde madde yaz."""
-        }]
+
+
+async def calisma_plani_olustur(gun: int, saat: int, sinav_turu: str, abone_mi: bool = False) -> str:
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        messages=[{"role": "user", "content": _CALISMA_PLANI_PROMPT.format(sinav_turu=sinav_turu, gun=gun, saat=saat)}]
     )
+    if not response.content or not hasattr(response.content[0], "text"):
+        raise ValueError("Anthropic API boş yanıt döndürdü.")
     return response.content[0].text
+
+
+def calisma_plani_stream(gun: int, saat: int, sinav_turu: str):
+    """Çalışma planı streaming versiyonu — async context manager döndürür."""
+    return client.messages.stream(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        messages=[{"role": "user", "content": _CALISMA_PLANI_PROMPT.format(sinav_turu=sinav_turu, gun=gun, saat=saat)}]
+    )
