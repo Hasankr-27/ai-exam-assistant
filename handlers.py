@@ -487,6 +487,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if beklenen == "sor":
                 context.user_data["son_soru"] = metin_original  # orijinal harf korunsun
                 context.user_data["son_sinav"] = sinav
+                context.user_data["yanlis_sayac"] = 0  # yeni soru → sayacı sıfırla
                 cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
             await _gonder_metin(update.message, cevap)
             if beklenen == "sor":
@@ -883,13 +884,27 @@ async def _menu_goster_sor(update: Update, sinav: str):
     )
 
 
+YANLIS_LIMIT = 3
+
 async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     son_soru = context.user_data.get("son_soru")
     sinav = context.user_data.get("son_sinav", "YKS")
+    yanlis_sayac = context.user_data.get("yanlis_sayac", 0)
     user_id = query.from_user.id
+
+    # Limit kontrolü
+    if yanlis_sayac >= YANLIS_LIMIT:
+        try:
+            await query.edit_message_text(
+                f"🛑 Bu soruyu {YANLIS_LIMIT} kez yeniden çözdüm.\n\n"
+                "Farklı bir soru sor veya öğretmeninden yardım al. 📚"
+            )
+        except Exception:
+            pass
+        return
 
     if not son_soru:
         try:
@@ -972,7 +987,12 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception:
             pass
 
-        cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve yine de hatalı olabilirim. Önemli sorularda kaynaktan kontrol et!"
+        context.user_data["yanlis_sayac"] = yanlis_sayac + 1
+        kalan = YANLIS_LIMIT - (yanlis_sayac + 1)
+        not_metni = "\n\n⚠️ *Not:* Ben yapay zekayım ve yine de hatalı olabilirim. Önemli sorularda kaynaktan kontrol et!"
+        if kalan > 0:
+            not_metni += f"\n_(Bu soru için {kalan} yeniden çözüm hakkın kaldı.)_"
+        cevap += not_metni
         # Yanıtı parçalara bölerek gönder
         MAX = 4000
         for parca in [cevap[i:i+MAX] for i in range(0, len(cevap), MAX)]:
