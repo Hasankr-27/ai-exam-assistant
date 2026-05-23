@@ -338,7 +338,8 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    metin = update.message.text.lower().strip()[:2000]
+    metin_original = update.message.text.strip()[:2000]
+    metin = metin_original.lower()
 
     # 0) Rate limit — write before any await to avoid race condition
     simdi = time.time()
@@ -484,7 +485,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Soru çözdür modunda sorumluluk reddi ekle + soruyu sakla
             if beklenen == "sor":
-                context.user_data["son_soru"] = metin
+                context.user_data["son_soru"] = metin_original  # orijinal harf korunsun
                 context.user_data["son_sinav"] = sinav
                 cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
             await _gonder_metin(update.message, cevap)
@@ -897,6 +898,16 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             pass
         return
 
+    if son_soru == "__foto__":
+        try:
+            await query.edit_message_text(
+                "📸 Fotoğraf sorusu için yeniden çözüm yapabilmem için "
+                "fotoğrafı tekrar gönder."
+            )
+        except Exception:
+            pass
+        return
+
     # Hak kontrolü
     try:
         durum = await kullanici_durumu(user_id)
@@ -1049,6 +1060,14 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ───────────────────────────────────────────
 
 async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Albüm/çoklu fotoğraf gönderimi engelle
+    if update.message.media_group_id:
+        await update.message.reply_text(
+            "📸 Lütfen tek seferde sadece *1 fotoğraf* gönder.",
+            parse_mode="Markdown"
+        )
+        return
+
     user_id = update.effective_user.id
     durum = await kullanici_durumu(user_id)
 
@@ -1139,7 +1158,7 @@ Net ve anlaşılır Türkçe kullan."""
 
         # Başarılı — foto sayacını artır (mesaj hakkı zaten mesaj_hakkini_kullan'da tüketildi)
         context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
-        context.user_data["son_soru"] = "📸 (Fotoğraftaki soru) — Lütfen soruyu tekrar metin olarak yaz."
+        context.user_data["son_soru"] = "__foto__"  # fotoğraf sorusunu yeniden çözmek için foto tekrar gönderilmeli
         context.user_data["son_sinav"] = sinav
 
         cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
