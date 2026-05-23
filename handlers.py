@@ -1,4 +1,5 @@
 import asyncio
+import random
 from collections import defaultdict
 from datetime import datetime
 import time
@@ -521,6 +522,49 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # SORU SAYISI SEÇİMİ (callback)
 # ───────────────────────────────────────────
 
+def _sikları_karistir(soru_data: dict) -> dict:
+    """Şık içeriklerini karıştırır ve cevap harfini buna göre günceller."""
+    soru_metni = soru_data.get("soru", "")
+    dogru_harf = soru_data.get("cevap", "A").strip().upper()
+
+    satirlar = soru_metni.split("\n")
+    soru_bolum = []
+    siklar = []  # [(harf, icerik), ...]
+
+    for satir in satirlar:
+        temiz = satir.strip()
+        if len(temiz) >= 2 and temiz[0] in "ABCDE" and temiz[1] == ")":
+            siklar.append((temiz[0], temiz[2:].strip()))
+        else:
+            if not siklar:
+                soru_bolum.append(satir)
+
+    if len(siklar) < 2 or dogru_harf not in dict(siklar):
+        return soru_data
+
+    dogru_icerik = dict(siklar)[dogru_harf]
+    harfler = [h for h, _ in siklar]
+    icerikler = [ic for _, ic in siklar]
+
+    random.shuffle(icerikler)
+
+    yeni_dogru = None
+    yeni_satirlar = [s for s in soru_bolum if s or not siklar]
+    for i, harf in enumerate(harfler):
+        yeni_satirlar.append(f"{harf}) {icerikler[i]}")
+        if icerikler[i] == dogru_icerik:
+            yeni_dogru = harf
+
+    if yeni_dogru is None:
+        return soru_data
+
+    return {
+        "soru": "\n".join(yeni_satirlar),
+        "cevap": yeni_dogru,
+        "cozum": soru_data.get("cozum", ""),
+    }
+
+
 def _json_onar(metin: str) -> str:
     """JSON string değerlerindeki literal newline'ları kaçış dizisiyle değiştirir."""
     sonuc = []
@@ -614,17 +658,19 @@ Sen bir {sinav} sınav uzmanısın. SADECE {sinav} sınavının {ders} dersinden
 {sinav} sınavı {ders} dersi {konu} konusu ile ilgili {sayi} adet çoktan seçmeli soru hazırla.{gecmis_metin}
 
 ÖNEMLİ KURALLAR:
-- Her soruyu hazırlamadan önce cevabını kendин hesapla/doğrula
+- Her soruyu hazırlamadan önce cevabını kendin hesapla/doğrula
 - Doğru cevap şıklarda MUTLAKA bulunmalı
 - Yanlış şıklar makul ama kesinlikle yanlış olmalı
 - Gerçek {sinav} sınav zorluk seviyesinde olsun
 - Sorular birbirinden farklı alt konuları kapsasın
+- DOĞRU CEVAP KONUMU: Her soruda doğru cevabı farklı bir şıkta konumlandır.
+  Tüm sorularda aynı şık (örn. hep A) doğru olmamalı; A, B, C, D, E arasında dağıt.
 
 Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yazma.
 [
   {{
     "soru": "Soru metni...\\nA) ...\\nB) ...\\nC) ...\\nD) ...\\nE) ...",
-    "cevap": "A",
+    "cevap": "C",
     "cozum": "Adım adım çözüm: neden bu cevap doğru, diğerleri neden yanlış."
   }}
 ]
@@ -655,6 +701,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
         for i, soru_data in enumerate(sorular):
             if not isinstance(soru_data, dict):
                 continue
+            soru_data = _sikları_karistir(soru_data)  # şıkları karıştır
             context.user_data[f"soru_{i}"] = soru_data.get("soru", "")
             context.user_data[f"cevap_{i}"] = soru_data.get("cevap", "A")
             context.user_data[f"cozum_{i}"] = soru_data.get("cozum", "")
