@@ -480,8 +480,15 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await placeholder.delete()
             except Exception:
                 pass
+
+            # Soru çözdür modunda sorumluluk reddi ekle
+            if beklenen == "sor":
+                cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
             await _gonder_metin(update.message, cevap)
-            await _menu_goster(update, sinav)
+            if beklenen == "sor":
+                await _menu_goster_sor(update, sinav)
+            else:
+                await _menu_goster(update, sinav)
 
         except (RateLimitError, APIStatusError) as e:
             print(f"Anthropic API yük hatası: {type(e).__name__}: {e}")
@@ -798,6 +805,50 @@ async def _menu_goster(update: Update, sinav: str):
     )
 
 
+async def _menu_goster_sor(update: Update, sinav: str):
+    keyboard = [
+        [
+            InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+        ],
+        [
+            InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+            InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+        ],
+        [
+            InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+            InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        f"📚 {sinav} — Başka ne yapmak istersin?",
+        reply_markup=reply_markup,
+    )
+
+
+async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        await query.edit_message_text(
+            "📝 Bildirimin için teşekkürler!\n\n"
+            "Yapay zeka bazen hata yapabilir. Bu soruyu:\n"
+            "• Ders kitabından\n"
+            "• Güvenilir bir kaynaktan\n"
+            "• Öğretmenine sorarak\n\n"
+            "kontrol etmeni öneririm. Başka bir soru sormak için menüyü kullan. 📚"
+        )
+    except Exception:
+        pass
+
+
 async def _menu_goster_chat(chat_id, context, sinav: str):
     keyboard = [
         [
@@ -930,8 +981,9 @@ Net ve anlaşılır Türkçe kullan."""
         # Başarılı — foto sayacını artır (mesaj hakkı zaten mesaj_hakkini_kullan'da tüketildi)
         context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
 
+        cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
         await _gonder_metin(update.message, cevap)
-        await _menu_goster(update, sinav)
+        await _menu_goster_sor(update, sinav)
 
     except (RateLimitError, APIStatusError) as e:
         print(f"Anthropic API yük hatası (foto): {type(e).__name__}: {e}")
