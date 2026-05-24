@@ -36,6 +36,7 @@ SINAV_DERSLERI = {
         "Vatandaşlık": "anayasa, vatandaşlık bilgisi",
         "Din": "din kültürü",
         "Eğitim Bilimleri": "gelişim psikolojisi, öğrenme, program geliştirme, ölçme değerlendirme",
+        "Güncel Bilgiler": "güncel olaylar, türkiye gündemi, dünya gündemi, ekonomi, spor, bilim teknoloji, uluslararası ilişkiler",
     },
     "DGS": {
     "Sayısal - Matematik": "matematik, sayılar, cebir, problemler",
@@ -110,6 +111,12 @@ Konu anlatımında şu yapıyı kullan:
 5. Sık sorulan soru tipleri
 
 Soru çözerken: Adımları numaralandır, mantık yürütmeyi göster, doğru cevabı açıkça belirt.
+
+GÜNCEL BİLGİLER konusunda özel kurallar:
+- Bilgi kesim tarihinden (2025 ortası) sonraki gelişmeleri BİLMİYORSUN, bunu açıkça belirt.
+- Tarih, isim, rakam içeren bilgilerde (bakanlıklar, nüfus, ekonomik veriler vb.) "bu bilgi güncel olmayabilir, resmi kaynaktan teyit et" uyarısı ekle.
+- Sabit/değişmeyen bilgileri (tarihsel olaylar, coğrafi bilgiler, kurumların yapısı) güvenle ver.
+
 Sadece KPSS müfredatındaki konulara cevap ver. Türkçe yaz.""",
 
     "DGS": """Sen DGS (Dikey Geçiş Sınavı) konusunda uzman bir öğretmensin. Sayısal ve Sözel bölümlerde yardımcı olursun.
