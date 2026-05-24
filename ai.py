@@ -36,7 +36,7 @@ SINAV_DERSLERI = {
         "Vatandaşlık": "anayasa, vatandaşlık bilgisi",
         "Din": "din kültürü",
         "Eğitim Bilimleri": "gelişim psikolojisi, öğrenme, program geliştirme, ölçme değerlendirme",
-        "Güncel Bilgiler": "güncel olaylar, türkiye gündemi, dünya gündemi, ekonomi, spor, bilim teknoloji, uluslararası ilişkiler",
+        "Genel Kültür": "türkiye'nin doğal güzellikleri, mağaralar, göller, dağlar, nehirler, doğal oluşumlar, unesco miras alanları, tarihi yerler, türkiye illeri ve bölgesel özellikler, flora fauna, bilim sanat müzik edebiyat genel bilgiler, uluslararası kuruluşlar",
     },
     "DGS": {
     "Sayısal - Matematik": "matematik, sayılar, cebir, problemler",
@@ -112,10 +112,12 @@ Konu anlatımında şu yapıyı kullan:
 
 Soru çözerken: Adımları numaralandır, mantık yürütmeyi göster, doğru cevabı açıkça belirt.
 
-GÜNCEL BİLGİLER konusunda özel kurallar:
-- Bilgi kesim tarihinden (2025 ortası) sonraki gelişmeleri BİLMİYORSUN, bunu açıkça belirt.
-- Tarih, isim, rakam içeren bilgilerde (bakanlıklar, nüfus, ekonomik veriler vb.) "bu bilgi güncel olmayabilir, resmi kaynaktan teyit et" uyarısı ekle.
-- Sabit/değişmeyen bilgileri (tarihsel olaylar, coğrafi bilgiler, kurumların yapısı) güvenle ver.
+GENEL KÜLTÜR konusunda:
+- Türkiye'nin doğal yapısı (mağaralar, göller, nehirler, dağlar, platolar), oluşum süreçleri ve özellikleri hakkında detaylı bilgi ver.
+- UNESCO Dünya Mirası alanlarını, tarihi yerleri, milli parkları anlat.
+- İllerin özelliklerini, bölgesel farklılıkları, ekonomik kaynaklarını açıkla.
+- Bilim, sanat, müzik, edebiyat alanında önemli isimleri ve eserleri kapsayan sorularda yardımcı ol.
+- Verdiğin coğrafi veya tarihi bilgileri mümkünse rakamla destekle (yükseklik, derinlik, uzunluk, yıl vb.).
 
 Sadece KPSS müfredatındaki konulara cevap ver. Türkçe yaz.""",
 
