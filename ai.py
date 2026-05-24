@@ -36,7 +36,7 @@ SINAV_DERSLERI = {
         "Vatandaşlık": "anayasa, vatandaşlık bilgisi",
         "Din": "din kültürü",
         "Eğitim Bilimleri": "gelişim psikolojisi, öğrenme, program geliştirme, ölçme değerlendirme",
-        "Genel Kültür": "türkiye'nin doğal güzellikleri, mağaralar, göller, dağlar, nehirler, doğal oluşumlar, unesco miras alanları, tarihi yerler, türkiye illeri ve bölgesel özellikler, flora fauna, bilim sanat müzik edebiyat genel bilgiler, uluslararası kuruluşlar",
+        "Genel Kültür": "güncel olaylar, türkiye'nin son dönem başarıları, uzay programı ve ilk türk astronotlar, teknoloji gelişmeleri, bilim dünyasındaki son keşifler, ödüller (nobel vb.), uluslararası kuruluşlar ve son kararlar, türkiye'nin imzaladığı anlaşmalar, spor başarıları, sanat müzik sinema son gelişmeler, çevre iklim değişikliği güncel veriler, ekonomi ve kalkınma projeleri, sağlık bilimleri son gelişmeler",
     },
     "DGS": {
     "Sayısal - Matematik": "matematik, sayılar, cebir, problemler",
@@ -113,11 +113,11 @@ Konu anlatımında şu yapıyı kullan:
 Soru çözerken: Adımları numaralandır, mantık yürütmeyi göster, doğru cevabı açıkça belirt.
 
 GENEL KÜLTÜR konusunda:
-- Türkiye'nin doğal yapısı (mağaralar, göller, nehirler, dağlar, platolar), oluşum süreçleri ve özellikleri hakkında detaylı bilgi ver.
-- UNESCO Dünya Mirası alanlarını, tarihi yerleri, milli parkları anlat.
-- İllerin özelliklerini, bölgesel farklılıkları, ekonomik kaynaklarını açıkla.
-- Bilim, sanat, müzik, edebiyat alanında önemli isimleri ve eserleri kapsayan sorularda yardımcı ol.
-- Verdiğin coğrafi veya tarihi bilgileri mümkünse rakamla destekle (yükseklik, derinlik, uzunluk, yıl vb.).
+- Türkiye ve dünyadan GÜNCEL olayları, son dönem gelişmeleri konu alan sorular sor.
+- Örnekler: uzaya çıkan ilk Türk astronot, Türkiye'nin uzay programı (TÜRKSAT, TUA), son teknoloji projeleri (TOGG, BAYRAKTAR, TCG Anadolu), Nobel ödülleri, önemli spor şampiyonlukları, güncel uluslararası anlaşmalar, iklim zirveleri, yeni keşifler.
+- Tarih soruları SORMA — o ayrı bir ders. Sorular "kim kazandı", "hangi yılda gerçekleşti", "hangi ülke", "kaçıncı kez" gibi çağdaş bilgi formatında olsun.
+- Bilgi kesme tarihinden sonraki olayları uydurmak yerine, güvenilir bilinen güncel bilgileri kullan.
+- Türkiye odaklı güncel bilgiler öncelikli, dünya geneli güncel bilgiler de kapsansın.
 
 Sadece KPSS müfredatındaki konulara cevap ver. Türkçe yaz.""",
 
