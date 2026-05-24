@@ -315,6 +315,30 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["secilen_ders"] = ders
     context.user_data["beklenen_islem"] = "soru"
 
+    # Konu gerektirmeyen dersler direkt soru sayısına geçer
+    KONU_GEREKMEZ = {"Genel Kültür"}
+    if ders in KONU_GEREKMEZ:
+        context.user_data["soru_konusu"] = "karışık genel kültür"
+        sayi_keyboard = [[
+            InlineKeyboardButton("1", callback_data="sayi_1"),
+            InlineKeyboardButton("2", callback_data="sayi_2"),
+            InlineKeyboardButton("3", callback_data="sayi_3"),
+            InlineKeyboardButton("4", callback_data="sayi_4"),
+            InlineKeyboardButton("5", callback_data="sayi_5"),
+        ]]
+        try:
+            await query.edit_message_text(
+                f"✅ *{ders}* seçildi!\n\nKaç soru hazırlayayım?",
+                reply_markup=InlineKeyboardMarkup(sayi_keyboard),
+                parse_mode="Markdown",
+            )
+        except Exception:
+            await query.edit_message_text(
+                f"✅ {ders} seçildi!\n\nKaç soru hazırlayayım?",
+                reply_markup=InlineKeyboardMarkup(sayi_keyboard),
+            )
+        return
+
     keyboard = [[InlineKeyboardButton("🔙 Geri", callback_data="geri_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
