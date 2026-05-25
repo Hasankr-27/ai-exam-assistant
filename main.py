@@ -28,6 +28,7 @@ from handlers import (
     geri_baslat,
     geri_menu,
     yanlis_cevap_handler,
+    tekrar_anlat_handler,
 )
 from payments import abone_ol, on_odeme_kontrol, odeme_tamamlandi, odeme_sec
 
@@ -82,6 +83,7 @@ def main():
     app.add_handler(CallbackQueryHandler(geri_baslat,     pattern="^geri_baslat$"))
     app.add_handler(CallbackQueryHandler(geri_menu,           pattern="^geri_menu$"))
     app.add_handler(CallbackQueryHandler(yanlis_cevap_handler, pattern="^yanlis_cevap$"))
+    app.add_handler(CallbackQueryHandler(tekrar_anlat_handler, pattern="^tekrar_anlat$"))
 
     # ── Ödeme ─────────────────────────────────
     app.add_handler(PreCheckoutQueryHandler(on_odeme_kontrol))

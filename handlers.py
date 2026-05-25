@@ -510,8 +510,10 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Soru çözdür modunda sorumluluk reddi ekle + soruyu sakla
             if beklenen == "sor":
                 context.user_data["son_soru"] = metin_original  # orijinal harf korunsun
+                context.user_data["son_ai_cevap"] = cevap
                 context.user_data["son_sinav"] = sinav
                 context.user_data["yanlis_sayac"] = 0  # yeni soru → sayacı sıfırla
+                context.user_data["tekrar_anlat_sayac"] = 0
                 cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
             await _gonder_metin(update.message, cevap)
             if beklenen == "sor":
@@ -830,6 +832,10 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sinav_adi = durum["sinav_turu"] or "YKS"
         except Exception:
             sinav_adi = "YKS"
+        # Son soruyu tekrar_anlat için sakla
+        context.user_data["son_soru"] = f"{soru}\n\nÇözüm: {cozum_metin}"
+        context.user_data["son_sinav"] = sinav_adi
+        context.user_data["tekrar_anlat_sayac"] = 0
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text="🎉 Test bitti! Sonuçlarını yukarıdan inceleyebilirsin."
@@ -884,6 +890,7 @@ async def _menu_goster_sor(update: Update, sinav: str):
     keyboard = [
         [
             InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+            InlineKeyboardButton("🤔 Anlamadım", callback_data="tekrar_anlat"),
         ],
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
@@ -1029,7 +1036,10 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         # Menü
         keyboard = [
-            [InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap")],
+            [
+                InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+                InlineKeyboardButton("🤔 Anlamadım", callback_data="tekrar_anlat"),
+            ],
             [
                 InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
                 InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
@@ -1063,8 +1073,165 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             pass
 
 
+# ───────────────────────────────────────────
+# TEKRAR ANLAT (callback)
+# ───────────────────────────────────────────
+
+TEKRAR_ANLAT_LIMIT = 3
+
+async def tekrar_anlat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    son_soru = context.user_data.get("son_soru")
+    son_ai_cevap = context.user_data.get("son_ai_cevap", "")
+    sinav = context.user_data.get("son_sinav", "YKS")
+    sayac = context.user_data.get("tekrar_anlat_sayac", 0)
+    user_id = query.from_user.id
+
+    if sayac >= TEKRAR_ANLAT_LIMIT:
+        try:
+            await query.edit_message_text(
+                f"🛑 Bu soruyu {TEKRAR_ANLAT_LIMIT} kez farklı şekilde anlattım.\n\n"
+                "Farklı bir soru sor ya da öğretmeninden destek al. 📚"
+            )
+        except Exception:
+            pass
+        return
+
+    if not son_soru or son_soru == "__foto__":
+        try:
+            await query.edit_message_text(
+                "⚠️ Hangi soruyu tekrar anlatacağımı bilemedim. Soruyu tekrar gönderir misin?"
+            )
+        except Exception:
+            pass
+        return
+
+    try:
+        durum = await kullanici_durumu(user_id)
+        hak_durumu = await mesaj_hakkini_kullan(user_id, durum["abone_mi"])
+    except Exception as e:
+        print(f"tekrar_anlat hak hatası: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, tekrar dene.")
+        except Exception:
+            pass
+        return
+
+    if not hak_durumu["izin_ver"]:
+        try:
+            await query.edit_message_text(
+                "⏰ Mesaj hakkın bitti!\nYarın sıfırlanacak veya /abone yazarak devam edebilirsin."
+            )
+        except Exception:
+            pass
+        return
+
+    try:
+        await query.edit_message_text("🤔 Farklı bir yaklaşımla yeniden anlatıyorum...")
+    except Exception:
+        pass
+
+    placeholder = await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text="⏳ Hazırlıyorum..."
+    )
+
+    onceki_bilgi = f"\n\nÖnceki açıklaman:\n{son_ai_cevap[:800]}" if son_ai_cevap else ""
+    prompt = (
+        "Bir öğrenci aşağıdaki soruyu/konuyu anlamadığını belirtti. "
+        "Tamamen farklı bir yaklaşımla, daha sade ve anlaşılır bir dille, "
+        "somut örnekler ve benzetmeler kullanarak adım adım yeniden açıkla."
+        f"{onceki_bilgi}\n\n"
+        f"Soru/Konu:\n{son_soru}"
+    )
+
+    cevap = ""
+    son_guncelleme = time.time()
+
+    try:
+        async with ai_cevap_al_stream(prompt, sinav, []) as stream:
+            async for chunk in stream.text_stream:
+                cevap += chunk
+                simdi = time.time()
+                if simdi - son_guncelleme >= 3.0 and cevap:
+                    try:
+                        goster = cevap[:3800] + " ..." if len(cevap) > 3800 else cevap + " ▌"
+                        await placeholder.edit_text(goster)
+                        son_guncelleme = simdi
+                    except Exception:
+                        pass
+
+        if not cevap:
+            await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
+            return
+
+        try:
+            await placeholder.delete()
+        except Exception:
+            pass
+
+        context.user_data["tekrar_anlat_sayac"] = sayac + 1
+        context.user_data["son_ai_cevap"] = cevap
+        kalan = TEKRAR_ANLAT_LIMIT - (sayac + 1)
+        not_metni = "\n\n💡 *Not:* Hâlâ anlamadıysan öğretmeninden destek alabilirsin."
+        if kalan > 0:
+            not_metni += f"\n_(Bu soru için {kalan} tekrar hakkın kaldı.)_"
+        cevap += not_metni
+
+        MAX = 4000
+        for parca in [cevap[i:i+MAX] for i in range(0, len(cevap), MAX)]:
+            try:
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id, text=parca, parse_mode="Markdown"
+                )
+            except Exception:
+                await context.bot.send_message(chat_id=query.message.chat_id, text=parca)
+
+        keyboard = [
+            [
+                InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+                InlineKeyboardButton("🤔 Anlamadım", callback_data="tekrar_anlat"),
+            ],
+            [
+                InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+                InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+            ],
+            [
+                InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+                InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+            ],
+            [
+                InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+                InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+            ],
+        ]
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"📚 {sinav} — Başka ne yapmak istersin?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    except (RateLimitError, APIStatusError) as e:
+        print(f"tekrar_anlat API hatası: {e}")
+        try:
+            await placeholder.edit_text("⚠️ Sunucu şu an yoğun, 30 saniye sonra tekrar dene.")
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"tekrar_anlat hatası: {e}\n{traceback.format_exc()}")
+        try:
+            await placeholder.edit_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        except Exception:
+            pass
+
+
 async def _menu_goster_chat(chat_id, context, sinav: str):
     keyboard = [
+        [
+            InlineKeyboardButton("🤔 Anlamadım, Tekrar Anlat", callback_data="tekrar_anlat"),
+        ],
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
