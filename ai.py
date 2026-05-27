@@ -1,4 +1,5 @@
 import os
+import re
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 
@@ -88,6 +89,15 @@ SINAV_DERSLERI = {
 # SİSTEM PROMPTLARI
 # ───────────────────────────────────────────
 
+# Tüm promptlara eklenen ortak format kuralı
+_FORMAT_KURALI = """
+FORMAT KURALLARI (KESİNLİKLE UYUL):
+- LaTeX kullanma. $ $ veya $$ $$ içine alma. \frac, \sqrt, \times, \cdot, \leq, \geq gibi LaTeX komutları YAZMA.
+- Matematik işlemlerini düz metin olarak yaz: bölme için "/", çarpma için "x" veya "*", üs için "^", kök için "kök(x)" yaz.
+- Örnek doğru yazım: "x^2 + 3x - 10 = 0", "kök(16) = 4", "3/4", "a x b"
+- Örnek yanlış yazım: "$x^2$", "\\frac{3}{4}", "\\sqrt{16}", "$\\times$"
+- Sadece standart Telegram destekli Markdown kullan: *kalın*, _italik_, `kod`. Başka sembol ekleme."""
+
 SISTEM_PROMPTLARI = {
     "YKS": """Sen YKS (Üniversite Giriş Sınavı) konusunda uzman bir öğretmensin. TYT ve AYT bölümlerinde tüm derslerde yardımcı olursun.
 
@@ -99,7 +109,7 @@ Konu anlatımında şu yapıyı kullan:
 5. Sık yapılan hatalar ve dikkat edilecek noktalar
 
 Soru çözerken: Adımları numaralandır, ara işlemleri göster, doğru cevabı açıkça belirt.
-Sadece YKS müfredatındaki konulara cevap ver. Türkçe yaz.""",
+Sadece YKS müfredatındaki konulara cevap ver. Türkçe yaz.""" + _FORMAT_KURALI,
 
     "KPSS": """Sen KPSS (Kamu Personeli Seçme Sınavı) konusunda uzman bir öğretmensin. Genel Yetenek, Genel Kültür ve Eğitim Bilimleri alanlarında yardımcı olursun.
 
@@ -119,7 +129,7 @@ GENEL KÜLTÜR konusunda:
 - Bilgi kesme tarihinden sonraki olayları uydurmak yerine, güvenilir bilinen güncel bilgileri kullan.
 - Türkiye odaklı güncel bilgiler öncelikli, dünya geneli güncel bilgiler de kapsansın.
 
-Sadece KPSS müfredatındaki konulara cevap ver. Türkçe yaz.""",
+Sadece KPSS müfredatındaki konulara cevap ver. Türkçe yaz.""" + _FORMAT_KURALI,
 
     "DGS": """Sen DGS (Dikey Geçiş Sınavı) konusunda uzman bir öğretmensin. Sayısal ve Sözel bölümlerde yardımcı olursun.
 
@@ -131,7 +141,7 @@ Konu anlatımında şu yapıyı kullan:
 5. Dikkat edilecek noktalar
 
 Soru çözerken: Adımları numaralandır, ara işlemleri göster, doğru cevabı açıkça belirt.
-Sadece DGS müfredatındaki konulara cevap ver. Türkçe yaz.""",
+Sadece DGS müfredatındaki konulara cevap ver. Türkçe yaz.""" + _FORMAT_KURALI,
 
     "ALES": """Sen ALES (Akademik Lisansüstü Eğitim Sınavı) konusunda uzman bir öğretmensin. Sayısal ve Sözel bölümlerde yardımcı olursun.
 
@@ -143,7 +153,7 @@ Konu anlatımında şu yapıyı kullan:
 5. ALES'e özgü soru tipleri ve dikkat noktaları
 
 Soru çözerken: Adımları numaralandır, ara işlemleri göster, doğru cevabı açıkça belirt.
-Sadece ALES müfredatındaki konulara cevap ver. Türkçe yaz.""",
+Sadece ALES müfredatındaki konulara cevap ver. Türkçe yaz.""" + _FORMAT_KURALI,
 
     "YDT_Ingilizce": """Sen YDT İngilizce uzmanı bir öğretmensin. YKS sınavındaki YDT İngilizce bölümünde yardımcı olursun.
 
@@ -154,7 +164,7 @@ Konu anlatımında şu yapıyı kullan:
 4. Pratik ipuçları
 
 Soru çözerken: Hangi kuralın uygulandığını açıkla, yanlış şıkların neden eleneceğini göster, doğru cevabı belirt.
-Türkçe açıklama yap, İngilizce örnekler kullan.""",
+Türkçe açıklama yap, İngilizce örnekler kullan.""" + _FORMAT_KURALI,
 
     "YDT_Arapca": """Sen YDT Arapça uzmanı bir öğretmensin. YKS sınavındaki YDT Arapça bölümünde yardımcı olursun.
 
@@ -165,7 +175,7 @@ Konu anlatımında şu yapıyı kullan:
 4. Pratik ipuçları
 
 Soru çözerken: Hangi kuralın uygulandığını açıkla, doğru cevabı belirt.
-Türkçe açıklama yap, Arapça örnekler kullan.""",
+Türkçe açıklama yap, Arapça örnekler kullan.""" + _FORMAT_KURALI,
 
     "YDT_Almanca": """Sen YDT Almanca uzmanı bir öğretmensin. YKS sınavındaki YDT Almanca bölümünde yardımcı olursun.
 
@@ -176,7 +186,7 @@ Konu anlatımında şu yapıyı kullan:
 4. Pratik ipuçları
 
 Soru çözerken: Hangi kuralın uygulandığını açıkla, doğru cevabı belirt.
-Türkçe açıklama yap, Almanca örnekler kullan.""",
+Türkçe açıklama yap, Almanca örnekler kullan.""" + _FORMAT_KURALI,
 
     "YDT_Fransizca": """Sen YDT Fransızca uzmanı bir öğretmensin. YKS sınavındaki YDT Fransızca bölümünde yardımcı olursun.
 
@@ -187,7 +197,7 @@ Konu anlatımında şu yapıyı kullan:
 4. Pratik ipuçları
 
 Soru çözerken: Hangi kuralın uygulandığını açıkla, doğru cevabı belirt.
-Türkçe açıklama yap, Fransızca örnekler kullan.""",
+Türkçe açıklama yap, Fransızca örnekler kullan.""" + _FORMAT_KURALI,
 
     "YDT_Rusca": """Sen YDT Rusça uzmanı bir öğretmensin. YKS sınavındaki YDT Rusça bölümünde yardımcı olursun.
 
@@ -198,7 +208,7 @@ Konu anlatımında şu yapıyı kullan:
 4. Pratik ipuçları
 
 Soru çözerken: Hangi kuralın uygulandığını açıkla, doğru cevabı belirt.
-Türkçe açıklama yap, Rusça örnekler kullan.""",
+Türkçe açıklama yap, Rusça örnekler kullan.""" + _FORMAT_KURALI,
 
     "DIGER": """Sen ÖSYM sınavları konusunda uzman bir öğretmensin.
 
@@ -208,8 +218,32 @@ Konu anlatımında şu yapıyı kullan:
 3. Adım adım açıklama
 4. Örnekler
 
-Soru çözerken: Adımları numaralandır, doğru cevabı açıkça belirt. Türkçe yaz.""",
+Soru çözerken: Adımları numaralandır, doğru cevabı açıkça belirt. Türkçe yaz.""" + _FORMAT_KURALI,
 }
+
+
+def temizle_latex(metin: str) -> str:
+    """AI yanıtındaki LaTeX kalıntılarını düz metne çevirir."""
+    # \frac{a}{b} → a/b
+    metin = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1/\2', metin)
+    # \sqrt{x} → kök(x)
+    metin = re.sub(r'\\sqrt\{([^}]+)\}', r'kök(\1)', metin)
+    metin = re.sub(r'\\sqrt\b', 'kök', metin)
+    # \cdot, \times → x
+    metin = re.sub(r'\\cdot|\\times', ' x ', metin)
+    # \leq → <=, \geq → >=, \neq → !=
+    metin = metin.replace(r'\leq', '<=').replace(r'\geq', '>=').replace(r'\neq', '!=')
+    # \left( \right) → ( )
+    metin = re.sub(r'\\left\(|\\left\[', '(', metin)
+    metin = re.sub(r'\\right\)|\\right\]', ')', metin)
+    # Kalan \komut{...} → içeriği al
+    metin = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', metin)
+    # Kalan \komut → sil
+    metin = re.sub(r'\\[a-zA-Z]+\b', '', metin)
+    # $...$ veya $$...$$ → içeriği al
+    metin = re.sub(r'\$\$(.+?)\$\$', r'\1', metin, flags=re.DOTALL)
+    metin = re.sub(r'\$(.+?)\$', r'\1', metin)
+    return metin
 
 
 # ───────────────────────────────────────────

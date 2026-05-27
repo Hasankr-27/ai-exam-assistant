@@ -18,7 +18,7 @@ from database import (
     gunluk_mesaj_artir,
     mesaj_hakkini_kullan,
 )
-from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur
+from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur, temizle_latex
 import os
 from dotenv import load_dotenv
 
@@ -498,6 +498,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 gecmis.append({"role": "assistant", "content": cevap})
                 context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
+            cevap = temizle_latex(cevap)
             if not cevap:
                 await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
                 return
@@ -1009,6 +1010,7 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     except Exception:
                         pass
 
+        cevap = temizle_latex(cevap)
         if not cevap:
             await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
             return
@@ -1163,6 +1165,7 @@ async def tekrar_anlat_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     except Exception:
                         pass
 
+        cevap = temizle_latex(cevap)
         if not cevap:
             await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
             return
