@@ -49,12 +49,12 @@ async def odeme_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if secim == "odeme_1ay":
         stars = ABONELIK_STARS
         baslik = "1 Aylık Abonelik"
-        aciklama = "✅ Günde 70 mesaj\n✅ 30 gün geçerli"
+        aciklama = "✅ Günde 50 mesaj\n✅ 30 gün geçerli"
         gun = 30
     else:
         stars = ABONELIK_3AY_STARS
         baslik = "3 Aylık Abonelik"
-        aciklama = "✅ Günde 70 mesaj\n✅ 90 gün geçerli\n✅ %20 indirimli 🎉"
+        aciklama = "✅ Günde 50 mesaj\n✅ 90 gün geçerli\n✅ %20 indirimli 🎉"
         gun = 90
 
     context.user_data["abonelik_gun"] = gun
@@ -97,7 +97,6 @@ async def odeme_tamamlandi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"🎉 Ödeme alındı, hoş geldin!\n\n"
-        f"✅ {gun} günlük aboneliğin aktif.\n"
-        f"📚 Günde 70 mesaj hakkın var.\n\n"
+        f"✅ {gun} günlük aboneliğin aktif.\n\n"
         "Hemen başlamak için bir şeyler sor! 🚀"
     )
