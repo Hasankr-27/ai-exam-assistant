@@ -86,8 +86,28 @@ SINAV_DERSLERI = {
 
 
 # ───────────────────────────────────────────
-# SİSTEM PROMPTLARI
+# MODEL SEÇİMİ
 # ───────────────────────────────────────────
+
+_SONNET = "claude-sonnet-4-6"
+_HAIKU  = "claude-haiku-4-5-20251001"
+
+# Bu anahtar kelimeler ders adında geçiyorsa Sonnet kullanılır
+_SONNET_ANAHTAR = {"matematik", "fizik", "kimya", "biyoloji", "türkçe", "geometri"}
+
+
+def ders_modeli(ders: str | None) -> str:
+    """Ders adına göre model döndürür. Bilinmiyorsa Sonnet."""
+    if not ders:
+        return _SONNET
+    ders_kucuk = ders.lower()
+    for anahtar in _SONNET_ANAHTAR:
+        if anahtar in ders_kucuk:
+            return _SONNET
+    return _HAIKU
+
+
+
 
 # Tüm promptlara eklenen ortak format kuralı
 _FORMAT_KURALI = """
@@ -269,12 +289,13 @@ async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_m
     return response.content[0].text
 
 
-def ai_cevap_al_stream(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, max_tokens: int = 1500):
+def ai_cevap_al_stream(mesaj: str, sinav_turu: str, sohbet_gecmisi: list,
+                       max_tokens: int = 1500, model: str = _SONNET):
     """Streaming versiyonu — async context manager döndürür."""
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["DIGER"])
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
     return client.messages.stream(
-        model="claude-sonnet-4-6",
+        model=model,
         max_tokens=max_tokens,
         system=[{"type": "text", "text": sistem, "cache_control": {"type": "ephemeral"}}],
         messages=mesajlar,

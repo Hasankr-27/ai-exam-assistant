@@ -15,7 +15,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 # ───────────────────────────────────────────
 
 BOT_ADI = "Sınav Asistanı"
-UCRETSIZ_HAK = 7          # Yeni kullanıcıya verilen ücretsiz hak
+UCRETSIZ_HAK = 5          # Yeni kullanıcıya verilen ücretsiz hak
 GUNLUK_LIMIT = 70         # Abonelere günlük mesaj limiti
 ABONELIK_STARS = 70        # 1 aylık
 ABONELIK_3AY_STARS = 200   # 3 aylık

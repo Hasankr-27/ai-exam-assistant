@@ -18,7 +18,7 @@ from database import (
     gunluk_mesaj_artir,
     mesaj_hakkini_kullan,
 )
-from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur, temizle_latex
+from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur, temizle_latex, ders_modeli
 import os
 from dotenv import load_dotenv
 
@@ -484,7 +484,8 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 son_guncelleme = time.time()
                 # konu anlatımı uzun olabilir, soru çözümü daha kısa
                 _max_tok = 2500 if beklenen == "konu" else 1500
-                async with ai_cevap_al_stream(metin, sinav, gecmis, max_tokens=_max_tok) as stream:
+                _model = ders_modeli(context.user_data.get("secilen_ders"))
+                async with ai_cevap_al_stream(metin, sinav, gecmis, max_tokens=_max_tok, model=_model) as stream:
                     async for chunk in stream.text_stream:
                         cevap += chunk
                         simdi = time.time()
@@ -514,6 +515,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data["son_soru"] = metin_original  # orijinal harf korunsun
                 context.user_data["son_ai_cevap"] = cevap
                 context.user_data["son_sinav"] = sinav
+                context.user_data["son_model"] = _model
                 context.user_data["yanlis_sayac"] = 0  # yeni soru → sayacı sıfırla
                 context.user_data["tekrar_anlat_sayac"] = 0
                 cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
@@ -708,7 +710,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 
     try:
         response = await client.messages.create(
-            model="claude-sonnet-4-6",
+            model=ders_modeli(ders),
             max_tokens=2500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -925,6 +927,7 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     son_soru = context.user_data.get("son_soru")
     sinav = context.user_data.get("son_sinav", "YKS")
+    son_model = context.user_data.get("son_model", "claude-sonnet-4-6")
     yanlis_sayac = context.user_data.get("yanlis_sayac", 0)
     user_id = query.from_user.id
 
@@ -999,7 +1002,7 @@ async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     son_guncelleme = time.time()
 
     try:
-        async with ai_cevap_al_stream(yeniden_prompt, sinav, []) as stream:
+        async with ai_cevap_al_stream(yeniden_prompt, sinav, [], model=son_model) as stream:
             async for chunk in stream.text_stream:
                 cevap += chunk
                 simdi = time.time()
@@ -1089,6 +1092,7 @@ async def tekrar_anlat_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     son_soru = context.user_data.get("son_soru")
     son_ai_cevap = context.user_data.get("son_ai_cevap", "")
     sinav = context.user_data.get("son_sinav", "YKS")
+    son_model = context.user_data.get("son_model", "claude-sonnet-4-6")
     sayac = context.user_data.get("tekrar_anlat_sayac", 0)
     user_id = query.from_user.id
 
@@ -1154,7 +1158,7 @@ async def tekrar_anlat_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     son_guncelleme = time.time()
 
     try:
-        async with ai_cevap_al_stream(prompt, sinav, []) as stream:
+        async with ai_cevap_al_stream(prompt, sinav, [], model=son_model) as stream:
             async for chunk in stream.text_stream:
                 cevap += chunk
                 simdi = time.time()
