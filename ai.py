@@ -269,13 +269,13 @@ async def ai_cevap_al(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, abone_m
     return response.content[0].text
 
 
-def ai_cevap_al_stream(mesaj: str, sinav_turu: str, sohbet_gecmisi: list):
+def ai_cevap_al_stream(mesaj: str, sinav_turu: str, sohbet_gecmisi: list, max_tokens: int = 1500):
     """Streaming versiyonu — async context manager döndürür."""
     sistem = SISTEM_PROMPTLARI.get(sinav_turu, SISTEM_PROMPTLARI["DIGER"])
     mesajlar = sohbet_gecmisi + [{"role": "user", "content": mesaj}]
     return client.messages.stream(
         model="claude-sonnet-4-6",
-        max_tokens=3000,
+        max_tokens=max_tokens,
         system=[{"type": "text", "text": sistem, "cache_control": {"type": "ephemeral"}}],
         messages=mesajlar,
     )

@@ -482,7 +482,9 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 placeholder = await update.message.reply_text("⏳ Düşünüyorum...")
                 cevap = ""
                 son_guncelleme = time.time()
-                async with ai_cevap_al_stream(metin, sinav, gecmis) as stream:
+                # konu anlatımı uzun olabilir, soru çözümü daha kısa
+                _max_tok = 2500 if beklenen == "konu" else 1500
+                async with ai_cevap_al_stream(metin, sinav, gecmis, max_tokens=_max_tok) as stream:
                     async for chunk in stream.text_stream:
                         cevap += chunk
                         simdi = time.time()
