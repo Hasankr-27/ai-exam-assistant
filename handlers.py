@@ -48,7 +48,6 @@ HAZIR_CEVAPLAR = {
 ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
-    "• Günde 50 mesaj hakkı\n"
     "• 1 Aylık → 60 ⭐\n"
     "• 3 Aylık → 150 ⭐\n\n"
     "Abone olmak için /abone yaz."
