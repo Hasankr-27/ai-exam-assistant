@@ -40,16 +40,16 @@ _user_locks: dict[int, asyncio.Lock] = {}
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 60 ⭐ — 3 aylık 150 ⭐!",
-    "ucret":      "💳 Aylık abonelik 60 ⭐ — 3 aylık 150 ⭐!",
+    "fiyat":      "💳 Aylık abonelik 70 ⭐ — 3 aylık 200 ⭐!",
+    "ucret":      "💳 Aylık abonelik 70 ⭐ — 3 aylık 200 ⭐!",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES, YDT sınavlarında uzman bir asistanım!",
 }
 
 ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
-    "• 1 Aylık → 60 ⭐\n"
-    "• 3 Aylık → 150 ⭐\n\n"
+    "• 1 Aylık → 70 ⭐\n"
+    "• 3 Aylık → 200 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
 
