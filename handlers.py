@@ -1358,14 +1358,28 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     },
                     {
                         "type": "text",
-                        "text": f"""Bu {sinav} sınav sorusunu çöz.
+                        "text": f"""Bu soruyu analiz et ve türüne göre cevapla:
 
-1. Önce soruyu ve şıkları oku
-2. Adım adım çözümü göster (matematiksel işlemleri açık yaz)
-3. Yanlış şıkların neden eleneceğini belirt
-4. En sona: ✅ Doğru cevap: [şık harfi] - [şık metni]
+Eğer MATEMATİK sorusuysa:
+- Sadece sayısal işlemleri yaz
+- Her adımı tek satırda göster
+- Formülleri düz metin olarak yaz (LaTeX kullanma)
+- Üs için ² ³ kullan
+- Gereksiz açıklama yapma, sadece işlemler
+- Sonucu net yaz: Cevap: ...
 
-Net ve anlaşılır Türkçe kullan."""
+Eğer SÖZEL sorusuysa (Türkçe, Edebiyat, Tarih, Coğrafya vs.):
+- Kısa ve net açıkla
+- Maksimum 3-4 cümle
+- Doğru şıkkı ve nedenini söyle
+
+KESİNLİKLE kullanma:
+- $$ işaretleri
+- ### başlıklar
+- \\boxed \\therefore \\quad gibi komutlar
+- Uzun giriş cümleleri
+
+Sınav türü: {sinav}"""
                     }
                 ]
             }]
