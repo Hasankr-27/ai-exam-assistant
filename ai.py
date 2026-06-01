@@ -132,7 +132,13 @@ Bunların yerine şunları kullan:
 
 Sonuç: *a + b = -2*
 
-Sadece standart Telegram Markdown kullan: *kalın*, _italik_. Başka sembol ekleme."""
+Sadece standart Telegram Markdown kullan: *kalın*, _italik_. Başka sembol ekleme.
+
+CEVAP UZUNLUĞU (KESİNLİKLE UYUL):
+- Gereksiz giriş cümlesi yazma ("Tabii ki!", "Harika soru!" vb.).
+- Sadece önemli adımları göster, maksimum 5-6 adım.
+- Sonucu en sona net yaz.
+- Uzun açıklama yapma, öz ol."""
 
 SISTEM_PROMPTLARI = {
     "YKS": """Sen YKS (Üniversite Giriş Sınavı) konusunda uzman bir öğretmensin. TYT ve AYT bölümlerinde tüm derslerde yardımcı olursun.
