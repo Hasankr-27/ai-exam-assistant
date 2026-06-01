@@ -112,11 +112,27 @@ def ders_modeli(ders: str | None) -> str:
 # Tüm promptlara eklenen ortak format kuralı
 _FORMAT_KURALI = """
 FORMAT KURALLARI (KESİNLİKLE UYUL):
-- LaTeX kullanma. $ $ veya $$ $$ içine alma. \frac, \sqrt, \times, \cdot, \leq, \geq gibi LaTeX komutları YAZMA.
-- Matematik işlemlerini düz metin olarak yaz: bölme için "/", çarpma için "x" veya "*", üs için "^", kök için "kök(x)" yaz.
-- Örnek doğru yazım: "x^2 + 3x - 10 = 0", "kök(16) = 4", "3/4", "a x b"
-- Örnek yanlış yazım: "$x^2$", "\\frac{3}{4}", "\\sqrt{16}", "$\\times$"
-- Sadece standart Telegram destekli Markdown kullan: *kalın*, _italik_, `kod`. Başka sembol ekleme."""
+- $$ işaretleri (LaTeX formatı) KULLANMA.
+- ### başlıklar KULLANMA.
+- \\boxed, \\therefore, \\quad gibi LaTeX komutları KULLANMA.
+- ^ işareti ile üs yazma (2^2 değil, 2² yaz).
+- \\frac, \\sqrt, \\times, \\cdot, \\leq, \\geq gibi LaTeX komutları YAZMA.
+
+Bunların yerine şunları kullan:
+- Adımları sadece sayı ile yaz: 1. 2. 3.
+- Üs için ² ³ karakterlerini kullan.
+- Çarpma için × kullan.
+- Sonucu kalın yazmak için *sonuç* kullan.
+- Formüller ve denklemler düz metin olarak yaz.
+
+Örnek doğru format:
+1. Adım: Çarpanlarına ayır
+2(a-b)(a+b) + 4(a-b) = 0
+(a-b) × [2(a+b) + 4] = 0
+
+Sonuç: *a + b = -2*
+
+Sadece standart Telegram Markdown kullan: *kalın*, _italik_. Başka sembol ekleme."""
 
 SISTEM_PROMPTLARI = {
     "YKS": """Sen YKS (Üniversite Giriş Sınavı) konusunda uzman bir öğretmensin. TYT ve AYT bölümlerinde tüm derslerde yardımcı olursun.
