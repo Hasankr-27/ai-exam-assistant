@@ -318,23 +318,21 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     KONU_GEREKMEZ = {"Genel Kültür"}
     if ders in KONU_GEREKMEZ:
         context.user_data["soru_konusu"] = "karışık genel kültür"
-        sayi_keyboard = [[
-            InlineKeyboardButton("1", callback_data="sayi_1"),
-            InlineKeyboardButton("2", callback_data="sayi_2"),
-            InlineKeyboardButton("3", callback_data="sayi_3"),
-            InlineKeyboardButton("4", callback_data="sayi_4"),
-            InlineKeyboardButton("5", callback_data="sayi_5"),
+        seviye_keyboard = [[
+            InlineKeyboardButton("🟢 Kolay", callback_data="seviye_kolay"),
+            InlineKeyboardButton("🟡 Orta",  callback_data="seviye_orta"),
+            InlineKeyboardButton("🔴 Zor",   callback_data="seviye_zor"),
         ]]
         try:
             await query.edit_message_text(
-                f"✅ *{ders}* seçildi!\n\nKaç soru hazırlayayım?",
-                reply_markup=InlineKeyboardMarkup(sayi_keyboard),
+                f"✅ *{ders}* seçildi!\n\nSoru zorluğu nedir?",
+                reply_markup=InlineKeyboardMarkup(seviye_keyboard),
                 parse_mode="Markdown",
             )
         except Exception:
             await query.edit_message_text(
-                f"✅ {ders} seçildi!\n\nKaç soru hazırlayayım?",
-                reply_markup=InlineKeyboardMarkup(sayi_keyboard),
+                f"✅ {ders} seçildi!\n\nSoru zorluğu nedir?",
+                reply_markup=InlineKeyboardMarkup(seviye_keyboard),
             )
         return
 
@@ -353,6 +351,35 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ {ders} seçildi!\n\n📝 Hangi konudan soru hazırlayayım?",
             reply_markup=reply_markup,
         )
+
+
+# ───────────────────────────────────────────
+# ZORLUK SEVİYESİ SEÇİMİ (callback)
+# ───────────────────────────────────────────
+
+async def seviye_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    seviye = query.data.replace("seviye_", "")  # kolay / orta / zor
+    context.user_data["soru_seviyesi"] = seviye
+
+    etiket = {"kolay": "🟢 Kolay", "orta": "🟡 Orta", "zor": "🔴 Zor"}.get(seviye, seviye)
+
+    keyboard = [[
+        InlineKeyboardButton("1", callback_data="sayi_1"),
+        InlineKeyboardButton("2", callback_data="sayi_2"),
+        InlineKeyboardButton("3", callback_data="sayi_3"),
+        InlineKeyboardButton("4", callback_data="sayi_4"),
+        InlineKeyboardButton("5", callback_data="sayi_5"),
+    ]]
+    try:
+        await query.edit_message_text(
+            f"{etiket} seviye seçildi!\n\nKaç soru hazırlayayım?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    except Exception:
+        pass
 
 
 # ───────────────────────────────────────────
@@ -414,15 +441,14 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if beklenen == "soru" and context.user_data.get("secilen_ders"):
         context.user_data["soru_konusu"] = metin
         keyboard = [[
-            InlineKeyboardButton("1", callback_data="sayi_1"),
-            InlineKeyboardButton("2", callback_data="sayi_2"),
-            InlineKeyboardButton("3", callback_data="sayi_3"),
-            InlineKeyboardButton("4", callback_data="sayi_4"),
-            InlineKeyboardButton("5", callback_data="sayi_5"),
+            InlineKeyboardButton("🟢 Kolay", callback_data="seviye_kolay"),
+            InlineKeyboardButton("🟡 Orta",  callback_data="seviye_orta"),
+            InlineKeyboardButton("🔴 Zor",   callback_data="seviye_zor"),
         ]]
         await update.message.reply_text(
-            f"📝 {metin} konusunda kaç soru hazırlayayım?",
+            f"📝 *{metin}* konusunda soru zorluğu nedir?",
             reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
         )
         return
 
@@ -658,6 +684,7 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sayi = int(query.data.replace("sayi_", ""))
     konu = context.user_data.get("soru_konusu", "")
     ders = context.user_data.get("secilen_ders", "")
+    seviye = context.user_data.get("soru_seviyesi", "orta")
     user_id = query.from_user.id
 
     try:
@@ -683,17 +710,25 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         son_sorular = gecmis_sorular[-10:]
         gecmis_metin = f"\nÖNEMLİ: Daha önce şu soruları sordun, BUNLARA BENZEMEYEN sorular üret:\n" + "\n".join(son_sorular)
 
+    seviye_aciklama = {
+        "kolay": "Temel kavramları test eden, doğrudan sorular. Formül ya da tanım bilinince hemen çözülür.",
+        "orta":  "Kavramları uygulama gerektiren sorular. Birkaç adım düşünme gerekir.",
+        "zor":   "Birden fazla konuyu harmanlayan, çok adımlı çözüm gerektiren sorular. Tuzak şıklar olabilir.",
+    }.get(seviye, "")
+
     prompt = f"""
 Sen bir {sinav} sınav uzmanısın. SADECE {sinav} sınavının {ders} dersinden soru hazırlıyorsun.
 {sinav} {ders} müfredatı dışına KESINLIKLE çıkma!
 
 {sinav} sınavı {ders} dersi {konu} konusu ile ilgili {sayi} adet çoktan seçmeli soru hazırla.{gecmis_metin}
 
+ZORLUK SEVİYESİ: {seviye.upper()}
+{seviye_aciklama}
+
 ÖNEMLİ KURALLAR:
 - Her soruyu hazırlamadan önce cevabını kendin hesapla/doğrula
 - Doğru cevap şıklarda MUTLAKA bulunmalı
 - Yanlış şıklar makul ama kesinlikle yanlış olmalı
-- Gerçek {sinav} sınav zorluk seviyesinde olsun
 - Sorular birbirinden farklı alt konuları kapsasın
 - DOĞRU CEVAP KONUMU: Her soruda doğru cevabı farklı bir şıkta konumlandır.
   Tüm sorularda aynı şık (örn. hep A) doğru olmamalı; A, B, C, D, E arasında dağıt.
