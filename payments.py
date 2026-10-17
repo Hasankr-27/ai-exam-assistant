@@ -21,16 +21,16 @@ async def abone_ol(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("1 Aylık — 60 ⭐", callback_data="odeme_1ay"),
-            InlineKeyboardButton("3 Aylık — 150 ⭐", callback_data="odeme_3ay"),
+            InlineKeyboardButton("1 Aylık — 70 ⭐", callback_data="odeme_1ay"),
+            InlineKeyboardButton("3 Aylık — 200 ⭐", callback_data="odeme_3ay"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
         "💳 Abonelik seçenekleri:\n\n"
-        "• 1 Aylık → 60 Stars\n"
-        "• 3 Aylık → 150 Stars (%20 indirimli 🎉)\n\n"
+        "• 1 Aylık → 70 Stars\n"
+        "• 3 Aylık → 200 Stars (%20 indirimli 🎉)\n\n"
         "Hangisini tercih edersin?",
         reply_markup=reply_markup,
     )
@@ -49,12 +49,12 @@ async def odeme_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if secim == "odeme_1ay":
         stars = ABONELIK_STARS
         baslik = "1 Aylık Abonelik"
-        aciklama = "✅ Günde 70 mesaj\n✅ 30 gün geçerli"
+        aciklama = "✅ 30 gün geçerli"
         gun = 30
     else:
         stars = ABONELIK_3AY_STARS
         baslik = "3 Aylık Abonelik"
-        aciklama = "✅ Günde 70 mesaj\n✅ 90 gün geçerli\n✅ %20 indirimli 🎉"
+        aciklama = "✅ 90 gün geçerli\n✅ %20 indirimli 🎉"
         gun = 90
 
     context.user_data["abonelik_gun"] = gun
@@ -97,7 +97,6 @@ async def odeme_tamamlandi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"🎉 Ödeme alındı, hoş geldin!\n\n"
-        f"✅ {gun} günlük aboneliğin aktif.\n"
-        f"📚 Günde 70 mesaj hakkın var.\n\n"
+        f"✅ {gun} günlük aboneliğin aktif.\n\n"
         "Hemen başlamak için bir şeyler sor! 🚀"
     )

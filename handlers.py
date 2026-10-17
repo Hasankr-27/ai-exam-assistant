@@ -1,4 +1,5 @@
 import asyncio
+import random
 from collections import defaultdict
 from datetime import datetime
 import time
@@ -17,7 +18,7 @@ from database import (
     gunluk_mesaj_artir,
     mesaj_hakkini_kullan,
 )
-from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur
+from ai import ai_cevap_al_stream, calisma_plani_stream, SINAV_DERSLERI, calisma_plani_olustur, temizle_latex, ders_modeli
 import os
 from dotenv import load_dotenv
 
@@ -39,17 +40,16 @@ _user_locks: dict[int, asyncio.Lock] = {}
 HAZIR_CEVAPLAR = {
     "merhaba":    "👋 Merhaba! /start yazarak başlayabilirsin.",
     "selam":      "👋 Selam! /start yazarak başlayabilirsin.",
-    "fiyat":      "💳 Aylık abonelik 60 ⭐ — 3 aylık 150 ⭐!",
-    "ucret":      "💳 Aylık abonelik 60 ⭐ — 3 aylık 150 ⭐!",
+    "fiyat":      "💳 Aylık abonelik 70 ⭐ — 3 aylık 200 ⭐!",
+    "ucret":      "💳 Aylık abonelik 70 ⭐ — 3 aylık 200 ⭐!",
     "sen kimsin": "🤖 Ben YKS, KPSS, DGS, ALES, YDT sınavlarında uzman bir asistanım!",
 }
 
 ABONELIK_MESAJI = (
     "⛔ Ücretsiz hakkın bitti!\n\n"
     "📚 Devam etmek için abone ol:\n"
-    "• Günde 70 mesaj hakkı\n"
-    "• 1 Aylık → 60 ⭐\n"
-    "• 3 Aylık → 150 ⭐\n\n"
+    "• 1 Aylık → 70 ⭐\n"
+    "• 3 Aylık → 200 ⭐\n\n"
     "Abone olmak için /abone yaz."
 )
 
@@ -314,6 +314,28 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["secilen_ders"] = ders
     context.user_data["beklenen_islem"] = "soru"
 
+    # Konu gerektirmeyen dersler direkt soru sayısına geçer
+    KONU_GEREKMEZ = {"Genel Kültür"}
+    if ders in KONU_GEREKMEZ:
+        context.user_data["soru_konusu"] = "karışık genel kültür"
+        seviye_keyboard = [[
+            InlineKeyboardButton("🟢 Kolay", callback_data="seviye_kolay"),
+            InlineKeyboardButton("🟡 Orta",  callback_data="seviye_orta"),
+            InlineKeyboardButton("🔴 Zor",   callback_data="seviye_zor"),
+        ]]
+        try:
+            await query.edit_message_text(
+                f"✅ *{ders}* seçildi!\n\nSoru zorluğu nedir?",
+                reply_markup=InlineKeyboardMarkup(seviye_keyboard),
+                parse_mode="Markdown",
+            )
+        except Exception:
+            await query.edit_message_text(
+                f"✅ {ders} seçildi!\n\nSoru zorluğu nedir?",
+                reply_markup=InlineKeyboardMarkup(seviye_keyboard),
+            )
+        return
+
     keyboard = [[InlineKeyboardButton("🔙 Geri", callback_data="geri_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -332,12 +354,42 @@ async def ders_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────────────────────────
+# ZORLUK SEVİYESİ SEÇİMİ (callback)
+# ───────────────────────────────────────────
+
+async def seviye_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    seviye = query.data.replace("seviye_", "")  # kolay / orta / zor
+    context.user_data["soru_seviyesi"] = seviye
+
+    etiket = {"kolay": "🟢 Kolay", "orta": "🟡 Orta", "zor": "🔴 Zor"}.get(seviye, seviye)
+
+    keyboard = [[
+        InlineKeyboardButton("1", callback_data="sayi_1"),
+        InlineKeyboardButton("2", callback_data="sayi_2"),
+        InlineKeyboardButton("3", callback_data="sayi_3"),
+        InlineKeyboardButton("4", callback_data="sayi_4"),
+        InlineKeyboardButton("5", callback_data="sayi_5"),
+    ]]
+    try:
+        await query.edit_message_text(
+            f"{etiket} seviye seçildi!\n\nKaç soru hazırlayayım?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    except Exception:
+        pass
+
+
+# ───────────────────────────────────────────
 # MESAJ HANDLER (ana akış)
 # ───────────────────────────────────────────
 
 async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    metin = update.message.text.lower().strip()[:2000]
+    metin_original = update.message.text.strip()[:2000]
+    metin = metin_original.lower()
 
     # 0) Rate limit — write before any await to avoid race condition
     simdi = time.time()
@@ -389,15 +441,14 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if beklenen == "soru" and context.user_data.get("secilen_ders"):
         context.user_data["soru_konusu"] = metin
         keyboard = [[
-            InlineKeyboardButton("1", callback_data="sayi_1"),
-            InlineKeyboardButton("2", callback_data="sayi_2"),
-            InlineKeyboardButton("3", callback_data="sayi_3"),
-            InlineKeyboardButton("4", callback_data="sayi_4"),
-            InlineKeyboardButton("5", callback_data="sayi_5"),
+            InlineKeyboardButton("🟢 Kolay", callback_data="seviye_kolay"),
+            InlineKeyboardButton("🟡 Orta",  callback_data="seviye_orta"),
+            InlineKeyboardButton("🔴 Zor",   callback_data="seviye_zor"),
         ]]
         await update.message.reply_text(
-            f"📝 {metin} konusunda kaç soru hazırlayayım?",
+            f"📝 *{metin}* konusunda soru zorluğu nedir?",
             reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
         )
         return
 
@@ -457,7 +508,10 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 placeholder = await update.message.reply_text("⏳ Düşünüyorum...")
                 cevap = ""
                 son_guncelleme = time.time()
-                async with ai_cevap_al_stream(metin, sinav, gecmis) as stream:
+                # konu anlatımı uzun olabilir, soru çözümü daha kısa
+                _max_tok = 2500 if beklenen == "konu" else 1500
+                _model = ders_modeli(context.user_data.get("secilen_ders"))
+                async with ai_cevap_al_stream(metin, sinav, gecmis, max_tokens=_max_tok, model=_model) as stream:
                     async for chunk in stream.text_stream:
                         cevap += chunk
                         simdi = time.time()
@@ -472,6 +526,7 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 gecmis.append({"role": "assistant", "content": cevap})
                 context.user_data["sohbet_gecmisi"] = gecmis[-10:]
 
+            cevap = temizle_latex(cevap)
             if not cevap:
                 await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
                 return
@@ -480,8 +535,21 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await placeholder.delete()
             except Exception:
                 pass
+
+            # Soru çözdür modunda sorumluluk reddi ekle + soruyu sakla
+            if beklenen == "sor":
+                context.user_data["son_soru"] = metin_original  # orijinal harf korunsun
+                context.user_data["son_ai_cevap"] = cevap
+                context.user_data["son_sinav"] = sinav
+                context.user_data["son_model"] = _model
+                context.user_data["yanlis_sayac"] = 0  # yeni soru → sayacı sıfırla
+                context.user_data["tekrar_anlat_sayac"] = 0
+                cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
             await _gonder_metin(update.message, cevap)
-            await _menu_goster(update, sinav)
+            if beklenen == "sor":
+                await _menu_goster_sor(update, sinav)
+            else:
+                await _menu_goster(update, sinav)
 
         except (RateLimitError, APIStatusError) as e:
             print(f"Anthropic API yük hatası: {type(e).__name__}: {e}")
@@ -511,6 +579,49 @@ async def mesaj_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ───────────────────────────────────────────
 # SORU SAYISI SEÇİMİ (callback)
 # ───────────────────────────────────────────
+
+def _sikları_karistir(soru_data: dict) -> dict:
+    """Şık içeriklerini karıştırır ve cevap harfini buna göre günceller."""
+    soru_metni = soru_data.get("soru", "")
+    dogru_harf = soru_data.get("cevap", "A").strip().upper()
+
+    satirlar = soru_metni.split("\n")
+    soru_bolum = []
+    siklar = []  # [(harf, icerik), ...]
+
+    for satir in satirlar:
+        temiz = satir.strip()
+        if len(temiz) >= 2 and temiz[0] in "ABCDE" and temiz[1] == ")":
+            siklar.append((temiz[0], temiz[2:].strip()))
+        else:
+            if not siklar:
+                soru_bolum.append(satir)
+
+    if len(siklar) < 2 or dogru_harf not in dict(siklar):
+        return soru_data
+
+    dogru_icerik = dict(siklar)[dogru_harf]
+    harfler = [h for h, _ in siklar]
+    icerikler = [ic for _, ic in siklar]
+
+    random.shuffle(icerikler)
+
+    yeni_dogru = None
+    yeni_satirlar = [s for s in soru_bolum if s or not siklar]
+    for i, harf in enumerate(harfler):
+        yeni_satirlar.append(f"{harf}) {icerikler[i]}")
+        if icerikler[i] == dogru_icerik:
+            yeni_dogru = harf
+
+    if yeni_dogru is None:
+        return soru_data
+
+    return {
+        "soru": "\n".join(yeni_satirlar),
+        "cevap": yeni_dogru,
+        "cozum": soru_data.get("cozum", ""),
+    }
+
 
 def _json_onar(metin: str) -> str:
     """JSON string değerlerindeki literal newline'ları kaçış dizisiyle değiştirir."""
@@ -573,6 +684,7 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sayi = int(query.data.replace("sayi_", ""))
     konu = context.user_data.get("soru_konusu", "")
     ders = context.user_data.get("secilen_ders", "")
+    seviye = context.user_data.get("soru_seviyesi", "orta")
     user_id = query.from_user.id
 
     try:
@@ -598,24 +710,34 @@ async def soru_sayisi_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         son_sorular = gecmis_sorular[-10:]
         gecmis_metin = f"\nÖNEMLİ: Daha önce şu soruları sordun, BUNLARA BENZEMEYEN sorular üret:\n" + "\n".join(son_sorular)
 
+    seviye_aciklama = {
+        "kolay": "Temel kavramları test eden, doğrudan sorular. Formül ya da tanım bilinince hemen çözülür.",
+        "orta":  "Kavramları uygulama gerektiren sorular. Birkaç adım düşünme gerekir.",
+        "zor":   "Birden fazla konuyu harmanlayan, çok adımlı çözüm gerektiren sorular. Tuzak şıklar olabilir.",
+    }.get(seviye, "")
+
     prompt = f"""
 Sen bir {sinav} sınav uzmanısın. SADECE {sinav} sınavının {ders} dersinden soru hazırlıyorsun.
 {sinav} {ders} müfredatı dışına KESINLIKLE çıkma!
 
 {sinav} sınavı {ders} dersi {konu} konusu ile ilgili {sayi} adet çoktan seçmeli soru hazırla.{gecmis_metin}
 
+ZORLUK SEVİYESİ: {seviye.upper()}
+{seviye_aciklama}
+
 ÖNEMLİ KURALLAR:
-- Her soruyu hazırlamadan önce cevabını kendин hesapla/doğrula
+- Her soruyu hazırlamadan önce cevabını kendin hesapla/doğrula
 - Doğru cevap şıklarda MUTLAKA bulunmalı
 - Yanlış şıklar makul ama kesinlikle yanlış olmalı
-- Gerçek {sinav} sınav zorluk seviyesinde olsun
 - Sorular birbirinden farklı alt konuları kapsasın
+- DOĞRU CEVAP KONUMU: Her soruda doğru cevabı farklı bir şıkta konumlandır.
+  Tüm sorularda aynı şık (örn. hep A) doğru olmamalı; A, B, C, D, E arasında dağıt.
 
 Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yazma.
 [
   {{
     "soru": "Soru metni...\\nA) ...\\nB) ...\\nC) ...\\nD) ...\\nE) ...",
-    "cevap": "A",
+    "cevap": "C",
     "cozum": "Adım adım çözüm: neden bu cevap doğru, diğerleri neden yanlış."
   }}
 ]
@@ -623,7 +745,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
 
     try:
         response = await client.messages.create(
-            model="claude-sonnet-4-6",
+            model=ders_modeli(ders),
             max_tokens=2500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -646,6 +768,7 @@ Sadece geçerli bir JSON array formatında çıktı ver. Başka hiçbir şey yaz
         for i, soru_data in enumerate(sorular):
             if not isinstance(soru_data, dict):
                 continue
+            soru_data = _sikları_karistir(soru_data)  # şıkları karıştır
             context.user_data[f"soru_{i}"] = soru_data.get("soru", "")
             context.user_data[f"cevap_{i}"] = soru_data.get("cevap", "A")
             context.user_data[f"cozum_{i}"] = soru_data.get("cozum", "")
@@ -748,6 +871,10 @@ async def cevap_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sinav_adi = durum["sinav_turu"] or "YKS"
         except Exception:
             sinav_adi = "YKS"
+        # Son soruyu tekrar_anlat için sakla
+        context.user_data["son_soru"] = f"{soru}\n\nÇözüm: {cozum_metin}"
+        context.user_data["son_sinav"] = sinav_adi
+        context.user_data["tekrar_anlat_sayac"] = 0
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text="🎉 Test bitti! Sonuçlarını yukarıdan inceleyebilirsin."
@@ -798,8 +925,356 @@ async def _menu_goster(update: Update, sinav: str):
     )
 
 
+async def _menu_goster_sor(update: Update, sinav: str):
+    keyboard = [
+        [
+            InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+            InlineKeyboardButton("🤔 Anlamadım", callback_data="tekrar_anlat"),
+        ],
+        [
+            InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+            InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+        ],
+        [
+            InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+            InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+            InlineKeyboardButton("🚨 Sorun Bildir", callback_data="sorun_bildir"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        f"📚 {sinav} — Başka ne yapmak istersin?",
+        reply_markup=reply_markup,
+    )
+
+
+YANLIS_LIMIT = 3
+
+async def yanlis_cevap_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    son_soru = context.user_data.get("son_soru")
+    sinav = context.user_data.get("son_sinav", "YKS")
+    son_model = context.user_data.get("son_model", "claude-sonnet-4-6")
+    yanlis_sayac = context.user_data.get("yanlis_sayac", 0)
+    user_id = query.from_user.id
+
+    # Limit kontrolü
+    if yanlis_sayac >= YANLIS_LIMIT:
+        try:
+            await query.edit_message_text(
+                f"🛑 Bu soruyu {YANLIS_LIMIT} kez yeniden çözdüm.\n\n"
+                "Farklı bir soru sor veya öğretmeninden yardım al. 📚"
+            )
+        except Exception:
+            pass
+        return
+
+    if not son_soru:
+        try:
+            await query.edit_message_text("⚠️ Soru bulunamadı, lütfen soruyu tekrar yaz.")
+        except Exception:
+            pass
+        return
+
+    if son_soru == "__foto__":
+        try:
+            await query.edit_message_text(
+                "📸 Fotoğraf sorusu için yeniden çözüm yapabilmem için "
+                "fotoğrafı tekrar gönder."
+            )
+        except Exception:
+            pass
+        return
+
+    # Hak kontrolü
+    try:
+        durum = await kullanici_durumu(user_id)
+        hak_durumu = await mesaj_hakkini_kullan(user_id, durum["abone_mi"])
+    except Exception as e:
+        print(f"yanlis_cevap hak hatası: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, tekrar dene.")
+        except Exception:
+            pass
+        return
+
+    if not hak_durumu["izin_ver"]:
+        try:
+            await query.edit_message_text(
+                "⏰ Mesaj hakkın bitti!\nYarın sıfırlanacak veya /abone yazarak devam edebilirsin."
+            )
+        except Exception:
+            pass
+        return
+
+    # Butonu kapat
+    try:
+        await query.edit_message_text("🔄 Soruyu dikkatlice yeniden çözüyorum...")
+    except Exception:
+        pass
+
+    # Yeni placeholder gönder
+    placeholder = await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text="⏳ Düşünüyorum..."
+    )
+
+    yeniden_prompt = (
+        "Bir öğrenci bu soruyu sana sordu ve verdiğin cevabın yanlış olduğunu bildirdi. "
+        "Soruyu baştan, çok dikkatli şekilde adım adım yeniden çöz. "
+        "Her işlemi tek tek kontrol et ve kesin olarak doğru cevabı bul:\n\n" + son_soru
+    )
+
+    cevap = ""
+    son_guncelleme = time.time()
+
+    try:
+        async with ai_cevap_al_stream(yeniden_prompt, sinav, [], model=son_model) as stream:
+            async for chunk in stream.text_stream:
+                cevap += chunk
+                simdi = time.time()
+                if simdi - son_guncelleme >= 3.0 and cevap:
+                    try:
+                        goster = cevap[:3800] + " ..." if len(cevap) > 3800 else cevap + " ▌"
+                        await placeholder.edit_text(goster)
+                        son_guncelleme = simdi
+                    except Exception:
+                        pass
+
+        cevap = temizle_latex(cevap)
+        if not cevap:
+            await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
+            return
+
+        try:
+            await placeholder.delete()
+        except Exception:
+            pass
+
+        context.user_data["yanlis_sayac"] = yanlis_sayac + 1
+        kalan = YANLIS_LIMIT - (yanlis_sayac + 1)
+        not_metni = "\n\n⚠️ *Not:* Ben yapay zekayım ve yine de hatalı olabilirim. Önemli sorularda kaynaktan kontrol et!"
+        if kalan > 0:
+            not_metni += f"\n_(Bu soru için {kalan} yeniden çözüm hakkın kaldı.)_"
+        cevap += not_metni
+        # Yanıtı parçalara bölerek gönder
+        MAX = 4000
+        for parca in [cevap[i:i+MAX] for i in range(0, len(cevap), MAX)]:
+            try:
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id, text=parca, parse_mode="Markdown"
+                )
+            except Exception:
+                await context.bot.send_message(chat_id=query.message.chat_id, text=parca)
+
+        # Menü
+        keyboard = [
+            [
+                InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+                InlineKeyboardButton("🤔 Anlamadım", callback_data="tekrar_anlat"),
+            ],
+            [
+                InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+                InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+            ],
+            [
+                InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+                InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+            ],
+            [
+                InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+                InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+            ],
+        ]
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"📚 {sinav} — Başka ne yapmak istersin?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    except (RateLimitError, APIStatusError) as e:
+        print(f"yanlis_cevap API hatası: {e}")
+        try:
+            await placeholder.edit_text("⚠️ Sunucu şu an yoğun, 30 saniye sonra tekrar dene.")
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"yanlis_cevap hatası: {e}\n{traceback.format_exc()}")
+        try:
+            await placeholder.edit_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        except Exception:
+            pass
+
+
+# ───────────────────────────────────────────
+# TEKRAR ANLAT (callback)
+# ───────────────────────────────────────────
+
+TEKRAR_ANLAT_LIMIT = 3
+
+async def tekrar_anlat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    son_soru = context.user_data.get("son_soru")
+    son_ai_cevap = context.user_data.get("son_ai_cevap", "")
+    sinav = context.user_data.get("son_sinav", "YKS")
+    son_model = context.user_data.get("son_model", "claude-sonnet-4-6")
+    sayac = context.user_data.get("tekrar_anlat_sayac", 0)
+    user_id = query.from_user.id
+
+    if sayac >= TEKRAR_ANLAT_LIMIT:
+        try:
+            await query.edit_message_text(
+                f"🛑 Bu soruyu {TEKRAR_ANLAT_LIMIT} kez farklı şekilde anlattım.\n\n"
+                "Farklı bir soru sor ya da öğretmeninden destek al. 📚"
+            )
+        except Exception:
+            pass
+        return
+
+    if not son_soru or son_soru == "__foto__":
+        try:
+            await query.edit_message_text(
+                "⚠️ Hangi soruyu tekrar anlatacağımı bilemedim. Soruyu tekrar gönderir misin?"
+            )
+        except Exception:
+            pass
+        return
+
+    try:
+        durum = await kullanici_durumu(user_id)
+        hak_durumu = await mesaj_hakkini_kullan(user_id, durum["abone_mi"])
+    except Exception as e:
+        print(f"tekrar_anlat hak hatası: {e}")
+        try:
+            await query.edit_message_text("⚠️ Bir hata oluştu, tekrar dene.")
+        except Exception:
+            pass
+        return
+
+    if not hak_durumu["izin_ver"]:
+        try:
+            await query.edit_message_text(
+                "⏰ Mesaj hakkın bitti!\nYarın sıfırlanacak veya /abone yazarak devam edebilirsin."
+            )
+        except Exception:
+            pass
+        return
+
+    try:
+        await query.edit_message_text("🤔 Farklı bir yaklaşımla yeniden anlatıyorum...")
+    except Exception:
+        pass
+
+    placeholder = await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text="⏳ Hazırlıyorum..."
+    )
+
+    onceki_bilgi = f"\n\nÖnceki açıklaman:\n{son_ai_cevap[:800]}" if son_ai_cevap else ""
+    prompt = (
+        "Bir öğrenci aşağıdaki soruyu/konuyu anlamadığını belirtti. "
+        "Tamamen farklı bir yaklaşımla, daha sade ve anlaşılır bir dille, "
+        "somut örnekler ve benzetmeler kullanarak adım adım yeniden açıkla."
+        f"{onceki_bilgi}\n\n"
+        f"Soru/Konu:\n{son_soru}"
+    )
+
+    cevap = ""
+    son_guncelleme = time.time()
+
+    try:
+        async with ai_cevap_al_stream(prompt, sinav, [], model=son_model) as stream:
+            async for chunk in stream.text_stream:
+                cevap += chunk
+                simdi = time.time()
+                if simdi - son_guncelleme >= 3.0 and cevap:
+                    try:
+                        goster = cevap[:3800] + " ..." if len(cevap) > 3800 else cevap + " ▌"
+                        await placeholder.edit_text(goster)
+                        son_guncelleme = simdi
+                    except Exception:
+                        pass
+
+        cevap = temizle_latex(cevap)
+        if not cevap:
+            await placeholder.edit_text("⚠️ Boş yanıt alındı, tekrar dener misin?")
+            return
+
+        try:
+            await placeholder.delete()
+        except Exception:
+            pass
+
+        context.user_data["tekrar_anlat_sayac"] = sayac + 1
+        context.user_data["son_ai_cevap"] = cevap
+        kalan = TEKRAR_ANLAT_LIMIT - (sayac + 1)
+        not_metni = "\n\n💡 *Not:* Hâlâ anlamadıysan öğretmeninden destek alabilirsin."
+        if kalan > 0:
+            not_metni += f"\n_(Bu soru için {kalan} tekrar hakkın kaldı.)_"
+        cevap += not_metni
+
+        MAX = 4000
+        for parca in [cevap[i:i+MAX] for i in range(0, len(cevap), MAX)]:
+            try:
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id, text=parca, parse_mode="Markdown"
+                )
+            except Exception:
+                await context.bot.send_message(chat_id=query.message.chat_id, text=parca)
+
+        keyboard = [
+            [
+                InlineKeyboardButton("⚠️ Yanlış Cevap", callback_data="yanlis_cevap"),
+                InlineKeyboardButton("🤔 Anlamadım", callback_data="tekrar_anlat"),
+            ],
+            [
+                InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
+                InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
+            ],
+            [
+                InlineKeyboardButton("💬 Soru Çözdür", callback_data="islem_sor"),
+                InlineKeyboardButton("📅 Çalışma Planı", callback_data="islem_plan"),
+            ],
+            [
+                InlineKeyboardButton("🔄 Sınav Değiştir", callback_data="sinav_degistir"),
+                InlineKeyboardButton("🔙 Geri", callback_data="geri_baslat"),
+            ],
+        ]
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"📚 {sinav} — Başka ne yapmak istersin?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    except (RateLimitError, APIStatusError) as e:
+        print(f"tekrar_anlat API hatası: {e}")
+        try:
+            await placeholder.edit_text("⚠️ Sunucu şu an yoğun, 30 saniye sonra tekrar dene.")
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"tekrar_anlat hatası: {e}\n{traceback.format_exc()}")
+        try:
+            await placeholder.edit_text("⚠️ Bir hata oluştu, tekrar dener misin?")
+        except Exception:
+            pass
+
+
 async def _menu_goster_chat(chat_id, context, sinav: str):
     keyboard = [
+        [
+            InlineKeyboardButton("🤔 Anlamadım, Tekrar Anlat", callback_data="tekrar_anlat"),
+        ],
         [
             InlineKeyboardButton("📖 Konu Anlat", callback_data="islem_konu"),
             InlineKeyboardButton("❓ Soru Hazırla", callback_data="islem_soru"),
@@ -839,6 +1314,14 @@ async def sinav_degistir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ───────────────────────────────────────────
 
 async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Albüm/çoklu fotoğraf gönderimi engelle
+    if update.message.media_group_id:
+        await update.message.reply_text(
+            "📸 Lütfen tek seferde sadece *1 fotoğraf* gönder.",
+            parse_mode="Markdown"
+        )
+        return
+
     user_id = update.effective_user.id
     durum = await kullanici_durumu(user_id)
 
@@ -910,14 +1393,28 @@ async def fotograf_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     },
                     {
                         "type": "text",
-                        "text": f"""Bu {sinav} sınav sorusunu çöz.
+                        "text": f"""Bu soruyu analiz et ve türüne göre cevapla:
 
-1. Önce soruyu ve şıkları oku
-2. Adım adım çözümü göster (matematiksel işlemleri açık yaz)
-3. Yanlış şıkların neden eleneceğini belirt
-4. En sona: ✅ Doğru cevap: [şık harfi] - [şık metni]
+Eğer MATEMATİK sorusuysa:
+- Sadece sayısal işlemleri yaz
+- Her adımı tek satırda göster
+- Formülleri düz metin olarak yaz (LaTeX kullanma)
+- Üs için ² ³ kullan
+- Gereksiz açıklama yapma, sadece işlemler
+- Sonucu net yaz: Cevap: ...
 
-Net ve anlaşılır Türkçe kullan."""
+Eğer SÖZEL sorusuysa (Türkçe, Edebiyat, Tarih, Coğrafya vs.):
+- Kısa ve net açıkla
+- Maksimum 3-4 cümle
+- Doğru şıkkı ve nedenini söyle
+
+KESİNLİKLE kullanma:
+- $$ işaretleri
+- ### başlıklar
+- \\boxed \\therefore \\quad gibi komutlar
+- Uzun giriş cümleleri
+
+Sınav türü: {sinav}"""
                     }
                 ]
             }]
@@ -929,9 +1426,12 @@ Net ve anlaşılır Türkçe kullan."""
 
         # Başarılı — foto sayacını artır (mesaj hakkı zaten mesaj_hakkini_kullan'da tüketildi)
         context.user_data[f"foto_{bugun}"] = foto_kullanimi + 1
+        context.user_data["son_soru"] = "__foto__"  # fotoğraf sorusunu yeniden çözmek için foto tekrar gönderilmeli
+        context.user_data["son_sinav"] = sinav
 
+        cevap += "\n\n⚠️ *Not:* Ben yapay zekayım ve hatalı cevap verebilirim. Lütfen kontrol et!"
         await _gonder_metin(update.message, cevap)
-        await _menu_goster(update, sinav)
+        await _menu_goster_sor(update, sinav)
 
     except (RateLimitError, APIStatusError) as e:
         print(f"Anthropic API yük hatası (foto): {type(e).__name__}: {e}")

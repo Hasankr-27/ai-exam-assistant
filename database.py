@@ -80,7 +80,7 @@ async def sinav_turu_guncelle(user_id: int, sinav_turu: str):
 async def mesaj_hakkini_kullan(user_id: int, abone_mi: bool) -> dict:
     """Atomik hak kontrolü: izin varsa sayacı artırır ve izin_ver=True döner."""
     bugun = datetime.now().strftime("%Y-%m-%d")
-    limit = 70 if abone_mi else 7
+    limit = 50 if abone_mi else 4
     pool = await _get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
