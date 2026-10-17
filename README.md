@@ -3,10 +3,6 @@
 YKS, KPSS, DGS, ALES ve YDT sınavlarına hazırlanan öğrenciler
 için yapay zeka destekli Telegram botu.
 
-## 📹 Demo
-
-[![Demo Video](video_thumbnail.png)](https://github.com/user-attachments/assets/58db7be1-ad8a-45a0-b517-adb68a82f1b2)
-
 
 )
 
