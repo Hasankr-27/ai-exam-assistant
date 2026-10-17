@@ -3,3 +3,7 @@ sinav_botu.db
 __pycache__/
 *.pyc
 *.pyo
+.idea/
+.vscode/
+*.sqlite
+*.sqlite3
