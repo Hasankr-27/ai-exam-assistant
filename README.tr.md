@@ -1,4 +1,4 @@
-# 📚 Sınav Asistanı — Yapay Zekâ Destekli Telegram Sınav Hazırlık Botu
+# 📚 AI Exam Assistant — Yapay Zekâ Destekli Telegram Sınav Hazırlık Botu
 
 YKS, KPSS, DGS, ALES ve YDT sınavlarına hazırlanan öğrenciler için yapay zekâ destekli bir Telegram asistanı. Claude (Anthropic) modelleriyle çalışır; konu anlatımı yapar, soru çözer, test hazırlar, çalışma planı çıkarır ve fotoğrafla gönderilen soruları analiz eder.
 
@@ -32,8 +32,8 @@ YKS, KPSS, DGS, ALES ve YDT sınavlarına hazırlanan öğrenciler için yapay z
 
 ### 1. Depoyu klonla
 ```bash
-git clone https://github.com/Hasankr-27/sinav-botu.git
-cd sinav-botu
+git clone https://github.com/Hasankr-27/ai-exam-assistant.git
+cd ai-exam-assistant
 ```
 
 ### 2. Sanal ortam oluştur
@@ -68,7 +68,7 @@ python main.py
 ## 🗂 Proje Yapısı
 
 ```
-sinav-botu/
+ai-exam-assistant/
 ├── main.py              # Bot başlatıcı ve handler kayıtları
 ├── handlers.py          # Mesaj/callback handler'ları
 ├── ai.py                # Claude API entegrasyonu, sistem promptları

@@ -61,7 +61,7 @@ async def odeme_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_invoice(
         chat_id=query.message.chat_id,
-        title=f"Sınav Asistanı — {baslik}",
+        title=f"AI Exam Assistant — {baslik}",
         description=aciklama,
         payload=f"abonelik_{gun}gun",
         provider_token="",  # BAK BURASI ÇOK KRİTİK! Burayı böyle BOMBOŞ bırak kanka.

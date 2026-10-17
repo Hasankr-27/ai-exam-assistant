@@ -14,7 +14,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 # BOT AYARLARI
 # ───────────────────────────────────────────
 
-BOT_ADI = "Sınav Asistanı"
+BOT_ADI = "AI Exam Assistant"
 UCRETSIZ_HAK = 4          # Yeni kullanıcıya verilen ücretsiz hak
 GUNLUK_LIMIT = 70         # Abonelere günlük mesaj limiti
 ABONELIK_STARS = 70        # 1 aylık
