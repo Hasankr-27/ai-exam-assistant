@@ -95,7 +95,7 @@ async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     hosgeldin = (
         f"👋 Merhaba {isim}!\n\n"
-        "🎯 *Sınav Asistanına Hoş Geldin!*\n\n"
+        "🎯 *AI Exam Assistant'a Hoş Geldin!*\n\n"
         "📚 Yapay zeka destekli asistanın ile:\n"
         "✅ Konu anlatımı al\n"
         "✅ Soru hazırlat ve çöz\n"

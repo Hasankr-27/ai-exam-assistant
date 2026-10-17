@@ -1,4 +1,4 @@
-# 🎯 Sınav Asistanı - Telegram Botu
+# 🎯 AI Exam Assistant - Telegram Botu
 
 YKS, KPSS, DGS, ALES ve YDT sınavlarına hazırlanan öğrenciler
 için yapay zeka destekli Telegram botu.
